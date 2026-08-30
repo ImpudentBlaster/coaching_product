@@ -1,0 +1,12 @@
+$ vitest run
+
+ RUN  v3.2.7 E:/coaching product/apps/api
+
+ ✓ src/app.spec.ts (4 tests) 892ms
+   ✓ coach approval flow > registers a forced-pending coach and lets only the admin approve it  780ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  10:13:07
+   Duration  2.77s (transform 296ms, setup 0ms, collect 1.06s, tests 892ms, environment 0ms, prepare 355ms)
+

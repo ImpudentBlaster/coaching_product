@@ -1,0 +1,38 @@
+import cors from 'cors';
+import cookieParser from 'cookie-parser';
+import express from 'express';
+import helmet from 'helmet';
+import { DemoIdentityStore } from './modules/identity/demo-store.js';
+import { PostgresIdentityStore } from './modules/identity/postgres-store.js';
+import { createIdentityRouter } from './modules/identity/router.js';
+import { createMvpRouter } from './modules/mvp/router.js';
+export async function createApp(environment) {
+    const app = express();
+    const identityStore = environment.DEMO_MODE
+        ? await DemoIdentityStore.create(environment.DEMO_ADMIN_EMAIL, environment.DEMO_ADMIN_PASSWORD)
+        : new PostgresIdentityStore(environment.DATABASE_URL);
+    app.disable('x-powered-by');
+    app.use(helmet());
+    app.use(cors({ origin: environment.WEB_ORIGIN, credentials: true }));
+    app.use(express.json({ limit: '1mb' }));
+    app.use(cookieParser());
+    app.use('/api/v1', createIdentityRouter(environment, identityStore));
+    if (identityStore instanceof PostgresIdentityStore)
+        app.use('/api/v1', createMvpRouter(environment, identityStore.pool));
+    app.get('/api/v1/health/live', (_request, response) => {
+        response.json({ status: 'ok' });
+    });
+    app.get('/api/v1/health/ready', (_request, response) => {
+        response.json({ status: 'ok' });
+    });
+    app.use((_request, response) => {
+        response.status(404).json({ code: 'NOT_FOUND', message: 'Resource not found' });
+    });
+    app.use((error, _request, response, _next) => {
+        void _next;
+        console.error(error instanceof Error ? error.message : 'Unknown request error');
+        response.status(500).json({ code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' });
+    });
+    return app;
+}
+//# sourceMappingURL=app.js.map
