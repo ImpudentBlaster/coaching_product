@@ -1,0 +1,20 @@
+{
+  "name": "coaching-product",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "engines": { "node": ">=22 <25" },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.6",
+    "typescript": "^5.9.2"
+  }
+}

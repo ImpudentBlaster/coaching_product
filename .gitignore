@@ -1,0 +1,14 @@
+node_modules/
+.turbo/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+storage/*
+!storage/.gitkeep
+*.log
+playwright-report/
+test-results/
+exercises_1.json
+exercise_images/

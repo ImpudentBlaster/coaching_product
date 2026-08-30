@@ -1,0 +1,7 @@
+node_modules
+dist
+coverage
+.turbo
+exercise_images
+exercises_1.json
+pnpm-lock.yaml
