@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/auth/auth-context';
 
 type NavItem = { label: string; to: string; icon: string };
@@ -43,6 +43,7 @@ const adminNavigation: NavGroup[] = [{ label: 'Platform', items: [
   { label: 'Dashboard', to: '/admin', icon: '⌂' },
   { label: 'Coach approvals', to: '/admin?status=PENDING_REVIEW', icon: '✓' },
   { label: 'All coaches', to: '/admin?status=ALL', icon: '♙' },
+  { label: 'Security audit', to: '/admin?view=audit', icon: '◇' },
 ] }];
 
 function Sidebar({ groups, name, role, onLogout }: { groups: NavGroup[]; name: string; role: string; onLogout: () => void }) {
@@ -50,7 +51,7 @@ function Sidebar({ groups, name, role, onLogout }: { groups: NavGroup[]; name: s
   return <aside className="app-sidebar">
     <Link className="sidebar-brand" to={role === 'COACH' ? '/coach' : role === 'CLIENT' ? '/client' : '/admin'}><span className="brand-mark">F</span><span>Forme<b>.</b></span></Link>
     <nav className="sidebar-nav" aria-label={`${role.toLowerCase()} navigation`}>
-      {groups.map((group) => <section className="nav-group" key={group.label}><p>{group.label}</p>{group.items.map((item) => <NavLink className={isCurrent(location.pathname, location.search, item.to) ? 'sidebar-link active' : 'sidebar-link'} key={item.label} to={item.to}><span className="nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span></NavLink>)}</section>)}
+      {groups.map((group) => <section className="nav-group" key={group.label}><p>{group.label}</p>{group.items.map((item) => <Link aria-current={isCurrent(location.pathname, location.search, item.to) ? 'page' : undefined} className={isCurrent(location.pathname, location.search, item.to) ? 'sidebar-link active' : 'sidebar-link'} key={item.label} to={item.to}><span className="nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span></Link>)}</section>)}
     </nav>
     <div className="sidebar-account"><div className="avatar">{name.charAt(0).toUpperCase()}</div><div><strong>{name}</strong><span>{role === 'PLATFORM_ADMIN' ? 'Platform admin' : role.toLowerCase()}</span></div><button onClick={onLogout} title="Sign out" aria-label="Sign out">↪</button></div>
   </aside>;
@@ -59,7 +60,7 @@ function Sidebar({ groups, name, role, onLogout }: { groups: NavGroup[]; name: s
 function MobileNav({ groups }: { groups: NavGroup[] }) {
   const location = useLocation();
   const items = groups.flatMap((group) => group.items).slice(0, 5);
-  return <nav className="mobile-nav" aria-label="Mobile navigation">{items.map((item) => <NavLink className={isCurrent(location.pathname, location.search, item.to) ? 'active' : ''} key={item.label} to={item.to}><span aria-hidden="true">{item.icon}</span><small>{item.label}</small></NavLink>)}</nav>;
+  return <nav className="mobile-nav" aria-label="Mobile navigation">{items.map((item) => <Link aria-current={isCurrent(location.pathname, location.search, item.to) ? 'page' : undefined} className={isCurrent(location.pathname, location.search, item.to) ? 'active' : ''} key={item.label} to={item.to}><span aria-hidden="true">{item.icon}</span><small>{item.label}</small></Link>)}</nav>;
 }
 
 function isCurrent(pathname: string, search: string, to: string) {

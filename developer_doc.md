@@ -100,6 +100,8 @@ Exercise imports use the external string ID as the stable key. GIF URLs use `/ap
 
 The web app is served at `http://127.0.0.1:5173` (or `localhost:5173`) and the API at `http://127.0.0.1:3000/api/v1`. Health endpoints are `/health/live` and `/health/ready` under that prefix.
 
+To confirm PostgreSQL persistence without changing any records, run `pnpm --filter @coaching/api db:inspect`. It prints the active database identity and current row count for every application table.
+
 ## 7. Demo seed
 
 Set all seed values explicitly in the current shell, then run:
