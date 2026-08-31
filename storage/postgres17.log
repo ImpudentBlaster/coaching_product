@@ -1,1 +1,60 @@
 2026-08-29 17:13:59.096 GMT [26988] FATAL:  invalid value for parameter "port": " 55432 -h 127.0.0.1"
+2026-08-29 22:44:18.847 IST [36752] LOG:  starting PostgreSQL 17.7 on x86_64-windows, compiled by msvc-19.44.35219, 64-bit
+2026-08-29 22:44:18.849 IST [36752] LOG:  listening on IPv4 address "127.0.0.1", port 55432
+2026-08-29 22:44:18.959 IST [27548] LOG:  database system was shut down at 2026-08-29 22:43:26 IST
+2026-08-29 22:44:19.017 IST [36752] LOG:  database system is ready to accept connections
+2026-08-29 22:44:33.941 IST [33180] FATAL:  role "CodexSandboxOffline" does not exist
+2026-08-30 09:06:00.234 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 09:07:56.347 IST [15384] LOG:  checkpoint complete: wrote 1070 buffers (6.5%); 0 WAL file(s) added, 0 removed, 0 recycled; write=114.883 s, sync=0.521 s, total=116.115 s; sync files=363, longest=0.333 s, average=0.002 s; distance=5058 kB, estimate=5058 kB; lsn=0/1A62E88, redo lsn=0/1A62DF8
+2026-08-30 09:08:27.043 IST [23300] FATAL:  role "CodexSandboxOffline" does not exist
+2026-08-30 09:09:18.449 IST [17788] ERROR:  inconsistent types deduced for parameter $1 at character 33
+2026-08-30 09:09:18.449 IST [17788] DETAIL:  text versus approval_status
+2026-08-30 09:09:18.449 IST [17788] STATEMENT:  UPDATE coach_clients SET status=$1,rejection_reason=$2,approved_at=CASE WHEN $1='APPROVED' THEN now() END,approved_by_user_id=$3,updated_at=now() WHERE id=$4
+2026-08-30 09:11:00.408 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 09:11:02.282 IST [26276] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 09:11:02.903 IST [15384] LOG:  checkpoint complete: wrote 21 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=2.269 s, sync=0.059 s, total=2.496 s; sync files=21, longest=0.040 s, average=0.003 s; distance=8 kB, estimate=4553 kB; lsn=0/1A65188, redo lsn=0/1A65130
+2026-08-30 09:16:00.017 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 09:16:01.208 IST [15384] LOG:  checkpoint complete: wrote 10 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.990 s, sync=0.009 s, total=1.192 s; sync files=10, longest=0.002 s, average=0.001 s; distance=5 kB, estimate=4098 kB; lsn=0/1A66828, redo lsn=0/1A667D0
+2026-08-30 09:18:56.976 IST [35900] FATAL:  role "CodexSandboxOffline" does not exist
+2026-08-30 09:21:01.010 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 09:21:01.816 IST [15384] LOG:  checkpoint complete: wrote 7 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.649 s, sync=0.007 s, total=0.806 s; sync files=7, longest=0.002 s, average=0.001 s; distance=7 kB, estimate=3689 kB; lsn=0/1A68460, redo lsn=0/1A68408
+2026-08-30 09:21:36.459 IST [33856] LOG:  invalid length of startup packet
+2026-08-30 09:26:01.870 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 09:26:02.732 IST [15384] LOG:  checkpoint complete: wrote 7 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.676 s, sync=0.007 s, total=0.862 s; sync files=7, longest=0.003 s, average=0.001 s; distance=6 kB, estimate=3321 kB; lsn=0/1A69F00, redo lsn=0/1A69EA8
+2026-08-30 09:30:45.603 IST [36300] LOG:  invalid length of startup packet
+2026-08-30 09:41:01.170 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 09:41:01.917 IST [15384] LOG:  checkpoint complete: wrote 7 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.653 s, sync=0.044 s, total=0.747 s; sync files=7, longest=0.041 s, average=0.007 s; distance=7 kB, estimate=2989 kB; lsn=0/1A6BC88, redo lsn=0/1A6BC30
+2026-08-30 09:51:01.935 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 09:51:03.138 IST [15384] LOG:  checkpoint complete: wrote 11 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=1.115 s, sync=0.044 s, total=1.204 s; sync files=11, longest=0.039 s, average=0.004 s; distance=11 kB, estimate=2692 kB; lsn=0/1A6EB78, redo lsn=0/1A6EB20
+2026-08-30 10:06:01.165 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 10:06:33.845 IST [15384] LOG:  checkpoint complete: wrote 304 buffers (1.9%); 1 WAL file(s) added, 0 removed, 0 recycled; write=32.601 s, sync=0.045 s, total=32.680 s; sync files=147, longest=0.002 s, average=0.001 s; distance=2249 kB, estimate=2647 kB; lsn=0/1CA1298, redo lsn=0/1CA1208
+2026-08-30 10:08:19.031 IST [11240] ERROR:  invalid input syntax for type json
+2026-08-30 10:08:19.031 IST [11240] DETAIL:  Expected ":", but found ",".
+2026-08-30 10:08:19.031 IST [11240] CONTEXT:  JSON data, line 1: ...,\"notes\":\"Good control\",\"completed\":true}",...
+	unnamed portal parameter $1 = '...'
+2026-08-30 10:08:19.031 IST [11240] STATEMENT:  UPDATE workout_sessions SET set_logs=$1,notes=$2,updated_at=now() WHERE id=$3 AND client_id=$4 AND status='IN_PROGRESS' RETURNING id,status,set_logs "setLogs"
+2026-08-30 10:11:01.887 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 10:11:13.464 IST [15384] LOG:  checkpoint complete: wrote 108 buffers (0.7%); 0 WAL file(s) added, 0 removed, 0 recycled; write=11.516 s, sync=0.042 s, total=11.578 s; sync files=64, longest=0.002 s, average=0.001 s; distance=90 kB, estimate=2392 kB; lsn=0/1CB7D18, redo lsn=0/1CB7C88
+2026-08-30 10:16:01.521 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 10:16:32.955 IST [15384] LOG:  checkpoint complete: wrote 298 buffers (1.8%); 0 WAL file(s) added, 0 removed, 0 recycled; write=31.399 s, sync=0.029 s, total=31.435 s; sync files=49, longest=0.002 s, average=0.001 s; distance=2481 kB, estimate=2481 kB; lsn=0/1F242E8, redo lsn=0/1F24258
+2026-08-30 10:21:01.998 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 10:21:03.752 IST [15384] LOG:  checkpoint complete: wrote 17 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=1.732 s, sync=0.015 s, total=1.754 s; sync files=15, longest=0.002 s, average=0.001 s; distance=21 kB, estimate=2235 kB; lsn=0/1F299A8, redo lsn=0/1F29950
+2026-08-30 10:26:01.796 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 10:26:04.111 IST [15384] LOG:  checkpoint complete: wrote 22 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=2.291 s, sync=0.015 s, total=2.315 s; sync files=20, longest=0.002 s, average=0.001 s; distance=54 kB, estimate=2017 kB; lsn=0/1F37CF0, redo lsn=0/1F37368
+2026-08-30 10:31:01.128 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 10:31:03.099 IST [15384] LOG:  checkpoint complete: wrote 19 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=1.952 s, sync=0.013 s, total=1.972 s; sync files=17, longest=0.002 s, average=0.001 s; distance=40 kB, estimate=1819 kB; lsn=0/1F414F8, redo lsn=0/1F414A0
+2026-08-30 10:36:01.120 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 10:36:01.984 IST [15384] LOG:  checkpoint complete: wrote 9 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.846 s, sync=0.009 s, total=0.865 s; sync files=8, longest=0.003 s, average=0.002 s; distance=19 kB, estimate=1639 kB; lsn=0/1F461B8, redo lsn=0/1F46160
+2026-08-30 10:41:01.990 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 10:41:02.663 IST [15384] LOG:  checkpoint complete: wrote 7 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.656 s, sync=0.007 s, total=0.673 s; sync files=7, longest=0.002 s, average=0.001 s; distance=18 kB, estimate=1477 kB; lsn=0/1F4AA28, redo lsn=0/1F4A9D0
+2026-08-30 10:46:01.674 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 10:46:02.429 IST [15384] LOG:  checkpoint complete: wrote 8 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.742 s, sync=0.006 s, total=0.756 s; sync files=8, longest=0.001 s, average=0.001 s; distance=19 kB, estimate=1331 kB; lsn=0/1F4F9B8, redo lsn=0/1F4F960
+2026-08-30 10:51:01.427 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 10:51:07.364 IST [15384] LOG:  checkpoint complete: wrote 56 buffers (0.3%); 0 WAL file(s) added, 0 removed, 0 recycled; write=5.888 s, sync=0.041 s, total=5.937 s; sync files=55, longest=0.002 s, average=0.001 s; distance=51 kB, estimate=1203 kB; lsn=0/1F5C638, redo lsn=0/1F5C5A8
+2026-08-30 12:04:21.098 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 12:04:22.005 IST [15384] LOG:  checkpoint complete: wrote 9 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.884 s, sync=0.006 s, total=0.907 s; sync files=9, longest=0.001 s, average=0.001 s; distance=16 kB, estimate=1084 kB; lsn=0/1F60940, redo lsn=0/1F608E8
+2026-08-30 12:09:21.021 IST [15384] LOG:  checkpoint starting: time
+2026-08-30 12:09:21.711 IST [15384] LOG:  checkpoint complete: wrote 7 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.656 s, sync=0.024 s, total=0.690 s; sync files=7, longest=0.007 s, average=0.004 s; distance=17 kB, estimate=978 kB; lsn=0/1F65138, redo lsn=0/1F650E0
+2026-08-31 09:18:30.251 IST [15384] LOG:  checkpoint starting: time
+2026-08-31 09:18:30.973 IST [15384] LOG:  checkpoint complete: wrote 7 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.653 s, sync=0.006 s, total=0.725 s; sync files=7, longest=0.002 s, average=0.001 s; distance=18 kB, estimate=882 kB; lsn=0/1F69B70, redo lsn=0/1F69B18

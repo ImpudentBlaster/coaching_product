@@ -2,10 +2,10 @@ $ vitest run --environment jsdom
 
  RUN  v3.2.7 E:/coaching product/apps/web
 
- ✓ src/app/app.test.tsx (1 test) 74ms
+ ✓ src/app/app.test.tsx (1 test) 136ms
 
  Test Files  1 passed (1)
       Tests  1 passed (1)
-   Start at  10:13:07
-   Duration  3.23s (transform 195ms, setup 0ms, collect 839ms, tests 74ms, environment 1.46s, prepare 221ms)
+   Start at  10:25:06
+   Duration  3.42s (transform 389ms, setup 0ms, collect 1.05s, tests 136ms, environment 1.13s, prepare 272ms)
 

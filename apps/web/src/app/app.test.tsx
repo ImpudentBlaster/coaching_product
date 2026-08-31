@@ -10,6 +10,6 @@ describe('application shell', () => {
     const memoryRouter = createMemoryRouter(router.routes, { initialEntries: ['/'] });
     render(<RouterProvider router={memoryRouter} />);
     expect(screen.getByRole('heading', { name: /focused home/i })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole('link', { name: 'Sign in' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByRole('link', { name: 'Sign in' })).toHaveLength(2));
   });
 });
