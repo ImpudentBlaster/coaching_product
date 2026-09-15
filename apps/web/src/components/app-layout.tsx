@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { EditorDialog } from './editor-dialog';
+import { useState, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/auth/auth-context';
 
@@ -13,7 +14,13 @@ const coachNavigation: NavGroup[] = [
     { label: 'Activity', to: '/coach/studio?tab=activity', icon: '↗' },
     { label: 'Feedback', to: '/coach/studio?tab=clients', icon: '✦' },
   ] },
-  { label: 'Build', items: [
+  { label: 'Nutrition', items: [
+    { label: 'Plans', to: '/coach/studio?tab=nutrition&section=plans', icon: '▤' },
+    { label: 'Days', to: '/coach/studio?tab=nutrition&section=days', icon: '▦' },
+    { label: 'Meals', to: '/coach/studio?tab=nutrition&section=meals', icon: '◒' },
+    { label: 'Foods', to: '/coach/studio?tab=nutrition&section=foods', icon: '⌁' },
+  ] },
+  { label: 'Training', items: [
     { label: 'Programs', to: '/coach/studio?tab=programs', icon: '▤' },
     { label: 'Workouts', to: '/coach/studio?tab=workouts', icon: '◫' },
     { label: 'Exercises', to: '/coach/studio?tab=exercises', icon: '⌁' },
@@ -51,7 +58,7 @@ function Sidebar({ groups, name, role, onLogout }: { groups: NavGroup[]; name: s
   return <aside className="app-sidebar">
     <Link className="sidebar-brand" to={role === 'COACH' ? '/coach' : role === 'CLIENT' ? '/client' : '/admin'}><span className="brand-mark">F</span><span>Forme<b>.</b></span></Link>
     <nav className="sidebar-nav" aria-label={`${role.toLowerCase()} navigation`}>
-      {groups.map((group) => <section className="nav-group" key={group.label}><p>{group.label}</p>{group.items.map((item) => <Link aria-current={isCurrent(location.pathname, location.search, item.to) ? 'page' : undefined} className={isCurrent(location.pathname, location.search, item.to) ? 'sidebar-link active' : 'sidebar-link'} key={item.label} to={item.to}><span className="nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span></Link>)}</section>)}
+      {groups.map((group) => <section className={group.label === 'Nutrition' ? 'nav-group nutrition-nav-group' : 'nav-group'} key={group.label}><p>{group.label}</p>{group.items.map((item) => <Link aria-current={isCurrent(location.pathname, location.search, item.to) ? 'page' : undefined} className={isCurrent(location.pathname, location.search, item.to) ? 'sidebar-link active' : 'sidebar-link'} key={item.label} to={item.to}><span className="nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span></Link>)}</section>)}
     </nav>
     <div className="sidebar-account"><div className="avatar">{name.charAt(0).toUpperCase()}</div><div><strong>{name}</strong><span>{role === 'PLATFORM_ADMIN' ? 'Platform admin' : role.toLowerCase()}</span></div><button onClick={onLogout} title="Sign out" aria-label="Sign out">↪</button></div>
   </aside>;
@@ -59,14 +66,19 @@ function Sidebar({ groups, name, role, onLogout }: { groups: NavGroup[]; name: s
 
 function MobileNav({ groups }: { groups: NavGroup[] }) {
   const location = useLocation();
-  const items = groups.flatMap((group) => group.items).slice(0, 5);
-  return <nav className="mobile-nav" aria-label="Mobile navigation">{items.map((item) => <Link aria-current={isCurrent(location.pathname, location.search, item.to) ? 'page' : undefined} className={isCurrent(location.pathname, location.search, item.to) ? 'active' : ''} key={item.label} to={item.to}><span aria-hidden="true">{item.icon}</span><small>{item.label}</small></Link>)}</nav>;
+  const [open,setOpen]=useState(false);
+ const {logout}=useAuth();
+ const items = groups.flatMap((group) => group.items).slice(0, 4);
+  return <><nav className="mobile-nav" aria-label="Mobile navigation">{items.map((item) => <Link aria-current={isCurrent(location.pathname, location.search, item.to) ? 'page' : undefined} className={isCurrent(location.pathname, location.search, item.to) ? 'active' : ''} key={item.label} to={item.to}><span aria-hidden="true">{item.icon}</span><small>{item.label}</small></Link>)}<button onClick={()=>setOpen(true)} aria-label="Open all navigation"><span>☰</span><small>Menu</small></button></nav>{open&&<EditorDialog title="Navigation" onClose={()=>setOpen(false)}><nav className="mobile-full-menu" aria-label="All pages">{groups.map(group=><section key={group.label}><h3>{group.label}</h3>{group.items.map(item=><Link key={item.to} to={item.to} onClick={()=>setOpen(false)} aria-current={isCurrent(location.pathname,location.search,item.to)?'page':undefined}>{item.label}</Link>)}</section>)}<button className="secondary" onClick={()=>{setOpen(false);void logout();}}>Sign out</button></nav></EditorDialog>}</>;
 }
 
 function isCurrent(pathname: string, search: string, to: string) {
   const [targetPath, targetSearch = ''] = to.split('?');
   if (pathname !== targetPath) return false;
-  return targetSearch ? search === `?${targetSearch}` : search === '';
+  const current = new URLSearchParams(search);
+  const target = new URLSearchParams(targetSearch);
+  if (current.get('tab') === 'nutrition' && !current.has('section')) current.set('section', 'plans');
+  return targetSearch ? [...target].every(([key, value]) => current.get(key) === value) : search === '';
 }
 
 function PublicShell({ children }: { children: ReactNode }) {

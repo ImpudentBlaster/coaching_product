@@ -1,3 +1,5 @@
+import { definitionSchema } from '../modules/mvp/checkin-model.js';
+const demoCheckin = definitionSchema.parse({ name: 'Weekly check-in', fields: [{ id: 'weight', label: 'Current weight', type: 'NUMBER', required: true, min: 0.01, max: 1000, unit: 'kg', metric: true }, { id: 'notes', label: 'How did your week go?', type: 'LONG_TEXT', required: false }] });
 import 'dotenv/config';
 import argon2 from 'argon2';
 import pg from 'pg';
@@ -37,7 +39,7 @@ try {
     await client.query('UPDATE program_assignments SET active=false WHERE coach_id=$1 AND client_id=$2 AND program_id<>$3', [coach, approvedClient, programId]);
     await client.query(`INSERT INTO program_assignments(coach_id,client_id,program_id,snapshot) SELECT $1,$2,$3,$4 WHERE NOT EXISTS(SELECT 1 FROM program_assignments WHERE coach_id=$1 AND client_id=$2 AND program_id=$3)`, [coach, approvedClient, programId, JSON.stringify(snapshot)]);
     await client.query(`INSERT INTO nutrition_plans(coach_id,client_id,daily_calories,protein_grams,carbohydrate_grams,fat_grams,meal_guidance,notes,starts_on) SELECT $1,$2,2200,150,240,70,'Build meals around protein and vegetables.','Demo target',current_date WHERE NOT EXISTS(SELECT 1 FROM nutrition_plans WHERE coach_id=$1 AND client_id=$2 AND active=true)`, [coach, approvedClient]);
-    await client.query(`INSERT INTO checkin_assignments(coach_id,client_id,due_date,notes) SELECT $1,$2,current_date+7,'Tell me how your week went.' WHERE NOT EXISTS(SELECT 1 FROM checkin_assignments WHERE coach_id=$1 AND client_id=$2 AND due_date>=current_date)`, [coach, approvedClient]);
+    await client.query(`INSERT INTO checkin_assignments(coach_id,client_id,due_date,notes,form_snapshot) SELECT $1,$2,current_date+7,'Tell me how your week went.',$3 WHERE NOT EXISTS(SELECT 1 FROM checkin_assignments WHERE coach_id=$1 AND client_id=$2 AND due_date>=current_date)`, [coach, approvedClient, JSON.stringify(demoCheckin)]);
     await client.query(`INSERT INTO feedback_messages(coach_id,client_id,author_user_id,context,message) SELECT $1,$2,$1,'GENERAL','Welcome! Your starter plan is ready.' WHERE NOT EXISTS(SELECT 1 FROM feedback_messages WHERE coach_id=$1 AND client_id=$2 AND message='Welcome! Your starter plan is ready.')`, [coach, approvedClient]);
     await client.query(`INSERT INTO subscriptions(coach_id,client_id,plan_name,status,starts_on,ends_or_renews_on,amount,currency,notes) VALUES($1,$2,'Demo Monthly Coaching','ACTIVE',current_date,current_date+30,99,'USD','Informational demo record') ON CONFLICT(coach_id,client_id) DO UPDATE SET plan_name=excluded.plan_name,status=excluded.status,starts_on=excluded.starts_on,ends_or_renews_on=excluded.ends_or_renews_on,amount=excluded.amount,currency=excluded.currency,notes=excluded.notes`, [coach, approvedClient]);
     await client.query('COMMIT');

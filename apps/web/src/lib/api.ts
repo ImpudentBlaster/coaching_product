@@ -51,9 +51,22 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
 
 async function send(path: string, init: RequestInit): Promise<Response> {
   const headers = new Headers(init.headers);
-  if (init.body !== undefined) headers.set('content-type', 'application/json');
+  if (init.body !== undefined && !headers.has('content-type')) headers.set('content-type', 'application/json');
   if (accessToken) headers.set('authorization', `Bearer ${accessToken}`);
   return fetch(`${apiUrl}${path}`, { ...init, headers, credentials: 'include' });
+}
+
+// Private media uses the same in-memory bearer token and cookie refresh flow.
+// Never put authentication tokens into image URLs or browser storage.
+export async function apiBlob(path:string):Promise<Blob> {
+  let response=await send(path,{});
+  if(response.status===401){
+    refreshRequest??=refreshAccessToken().finally(()=>{refreshRequest=null;});
+    await refreshRequest;
+    response=await send(path,{});
+  }
+  if(!response.ok)throw new Error('Unable to load this private photo.');
+  return response.blob();
 }
 
 async function refreshAccessToken(): Promise<void> {
