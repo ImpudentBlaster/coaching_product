@@ -1,0 +1,6 @@
+# Install on an always-on Linux host outside the Render web service:
+# crontab scripts/render-keepalive.cron
+# If that host already has a crontab, append these entries instead of replacing it.
+# Two requests per minute, offset by 30 seconds. No credentials required.
+* * * * * curl --fail --silent --show-error --max-time 25 https://coaching-product-api.onrender.com/api/v1/health/live > /dev/null
+* * * * * sleep 30; curl --fail --silent --show-error --max-time 25 https://coaching-product-api.onrender.com/api/v1/health/live > /dev/null
