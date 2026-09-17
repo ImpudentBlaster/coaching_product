@@ -40,6 +40,15 @@ export class DemoIdentityStore {
     return { invitationId: invitation.id, token, expiresAt: invitation.expiresAt };
   }
 
+  previewClientInvitation(token:string){
+    const tokenHash=hashToken(token);
+    const invitation=[...this.invitations.values()].find(candidate=>safeHashEqual(candidate.tokenHash,tokenHash));
+    if(!invitation||invitation.revokedAt)throw new Error('INVALID_INVITATION');
+    if(invitation.usedAt)throw new Error('INVITATION_USED');
+    if(new Date(invitation.expiresAt).getTime()<=Date.now())throw new Error('INVALID_INVITATION');
+    this.requireApprovedCoach(invitation.coachId);
+    return {email:invitation.email,displayName:''};
+  }
   async registerClient(input: { token: string; password: string; displayName: string }): Promise<{ user: PublicUser; relationship: CoachClient }> {
     const tokenHash = hashToken(input.token);
     const invitation = [...this.invitations.values()].find((candidate) => safeHashEqual(candidate.tokenHash, tokenHash));

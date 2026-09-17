@@ -87,6 +87,22 @@ export function createIdentityRouter(environment, store) {
             return response.status(410).json({ code: 'INVALID_RESET', message: 'This reset code is invalid, expired, or already used' });
         }
     });
+    router.post('/auth/client/invitation', authLimiter, async (request, response) => {
+        response.set('Cache-Control', 'no-store');
+        const parsed = z.object({ token: z.string().min(20).max(256) }).strict().safeParse(request.body);
+        if (!parsed.success)
+            return response.status(400).json({ message: 'This invitation link is incomplete.' });
+        try {
+            return response.json({ invitation: await store.previewClientInvitation(parsed.data.token) });
+        }
+        catch (error) {
+            if (error instanceof Error && error.message === 'INVITATION_USED')
+                return response.status(410).json({ message: 'This invitation has already been used. Sign in with the account you created.' });
+            if (error instanceof Error && ['INVALID_INVITATION', 'COACH_NOT_APPROVED'].includes(error.message))
+                return response.status(410).json({ message: 'This invitation is invalid, expired, or no longer available. Ask your coach for a new link.' });
+            throw error;
+        }
+    });
     router.post('/auth/client/register', authLimiter, async (request, response) => {
         const parsed = clientRegistrationSchema.safeParse(request.body);
         if (!parsed.success)

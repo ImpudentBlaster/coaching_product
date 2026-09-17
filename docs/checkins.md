@@ -7,7 +7,7 @@ The Check-ins page now supports coach-defined forms and durable submission/revie
 1. Create a form from the starter questions or change its name and questions.
 2. Choose numeric, integer rating, short-text or long-text answers. Configure required fields, numeric bounds, units, metric visibility and optional above/below attention thresholds.
 3. Reorder questions and preview the client form. Save and publish it, optionally marking it as the coach's default form.
-4. Assign the form to one or more approved clients. Choose a first due date and 1–366 days (30 by default). One assignment is generated per day immediately; no background scheduler is used. Existing historical schedules retain their dates.
+4. Assign the form to one or more approved clients. Choose a first due date, once/daily/weekly/every-two-weeks/monthly frequency, and 1–366 occurrences (30 by default). Assignments are generated immediately; no background scheduler is used. Existing historical schedules retain their dates.
 5. Filter check-in history by client and submission status. Customize metric columns and view a metric trend after filtering to one client.
 6. Open a check-in to inspect its answers and attention flags. Review submitted responses as On Track, Neutral or Needs Attention and leave feedback visible to the client. Review changes are retained in history.
 7. Change a pending/draft check-in's due date without changing the rest of its schedule. Submitted check-ins cannot be rescheduled.
@@ -37,7 +37,7 @@ All paths below are under `/api/v1`:
 
 - `GET/POST /coach/checkins/forms`: list/create published forms.
 - `PUT /coach/checkins/forms/:id`: publish another version with `{definition,isDefault,version}`.
-- `POST /coach/checkins`: `{formId?,clientIds,dueDate,frequency:"DAILY",occurrences,notes}`. Omit formId to use the default. Returns generated assignment IDs.
+- `POST /coach/checkins`: `{formId?,clientIds,dueDate,frequency:"ONCE"|"DAILY"|"WEEKLY"|"BIWEEKLY"|"MONTHLY",occurrences,notes}`. Omit formId to use the default. Returns generated assignment IDs.
 - `GET /coach/checkins`, `GET /client/checkins`: authorized history including form snapshots and answers.
 - `PUT /client/checkins/:id`: save `{revision,answers}` as a draft.
 - `POST /client/checkins/:id/submit`: validate and submit `{revision,answers}` atomically.
@@ -62,3 +62,10 @@ Clients upload JPEG, PNG or WebP images as binary `application/octet-stream` req
 `GET /{coach|client}/checkins/:id/photos` lists photo metadata; `GET /{coach|client}/checkins/:id/photos/:photoId` returns authenticated image bytes with no-store cache headers. Clients may `DELETE /client/checkins/:id/photos/:photoId` before submitting. Every route verifies the assignment owner and the currently approved relationship. Coaches have read-only access to their clients' photos. The UI fetches bytes using the in-memory access token and releases temporary blob URLs when unmounted.
 
 The submission transaction requires at least one stored photo and freezes its photo IDs alongside the answer history. Assignment locking prevents a concurrent delete from removing the last photo from a submitted check-in. Previously submitted historical check-ins without photos remain readable.
+## Same-day check-ins and schedule choices
+
+A client can complete different assigned forms on the same due date. Each form is assigned at most once per coach/client/date through the API, independent of its version or schedule. Overlapping schedules and rescheduling conflicts return 409, rolling back the entire request. Transaction-scoped advisory locks serialize concurrent scheduling for a coach/client pair. Existing historical duplicates remain readable; no responses or photos are deleted. Each assignment still permits only one immutable submission. This limit concerns the assigned due date, not the calendar day on which a client catches up on missed check-ins.
+
+Daily remains the default. Once, weekly, every two weeks, and monthly are also available. Monthly schedules preserve the start day where possible and clamp to month end. Environment examples, schema, and recurrence storage are unchanged.
+
+Kahunas documents weekly/bi-weekly/monthly check-ins and separate daily habit forms: https://help.kahunas.io/en/articles/224-walkthrough-forms . Its public documentation does not specify a repeated same-form submission limit; the once-per-form/date rule is this application's product choice, not a claim of exact Kahunas parity. Selecting multiple weekdays within one schedule is not implemented.

@@ -1,4 +1,46 @@
+# Dependencies and package-manager caches
 node_modules/
+.pnpm-store/
 
-# Turborepo caches and task logs
+# Build output and tool caches
+dist/
+build/
 .turbo/
+.vite/
+.cache/
+*.tsbuildinfo
+.eslintcache
+.prettiercache
+
+# Test and coverage output
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Local environment files (keep shareable examples)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Runtime data, private uploads, and authoritative local import inputs
+/storage/
+/exercises_1.json
+/exercise_images/
+
+# Logs and temporary files
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+*.swp
+*.swo
+
+# Machine-specific editor and operating-system files
+.idea/
+.vscode/*.local.json
+.DS_Store
+Thumbs.db
+Desktop.ini

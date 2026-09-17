@@ -53,6 +53,21 @@ describe.skipIf(!process.env.DATABASE_URL)('check-in storage and authorization',
     expect((await pool.query('SELECT id FROM checkin_logs WHERE assignment_id=$1',[legacy.rows[0]!.id])).rowCount).toBe(1);
   },30000);
   afterAll(async()=>{await pool.end();await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);await admin.end();});
+  it('prevents duplicate dates across schedules and rescheduling while allowing different forms',async()=>{
+    const makeForm=async()=>((await request(app).post('/coach/checkins/forms').set('Authorization',coachToken).send({definition})).body as {form:{id:string}}).form.id;
+    const formId=await makeForm();
+    const assign=(extra:object={})=>request(app).post('/coach/checkins').set('Authorization',coachToken).send({formId,clientIds:[person],dueDate:'2027-01-01',frequency:'WEEKLY',occurrences:2,...extra});
+    const responses=await Promise.all([assign(),assign()]);
+    expect(responses.map(result=>result.status).sort()).toEqual([201,409]);
+    const ids=(responses.find(result=>result.status===201)!.body as {assignmentIds:string[]}).assignmentIds;
+    expect((await pool.query<{date:string}>('SELECT due_date::text date FROM checkin_assignments WHERE id=ANY($1::uuid[]) ORDER BY due_date',[ids])).rows.map(row=>row.date)).toEqual(['2027-01-01','2027-01-08']);
+    expect((await assign({dueDate:'2026-12-25',occurrences:3})).status).toBe(409);
+    expect((await pool.query('SELECT id FROM checkin_assignments WHERE form_id=$1',[formId])).rowCount).toBe(2);
+    expect((await request(app).post(`/coach/checkins/${ids[1]!}/reschedule`).set('Authorization',coachToken).send({previousDate:'2027-01-08',dueDate:'2027-01-01'})).status).toBe(409);
+    expect((await request(app).post(`/coach/checkins/${ids[1]!}/reschedule`).set('Authorization',coachToken).send({previousDate:'2027-01-08',dueDate:'2027-01-09'})).status).toBe(200);
+    expect((await assign({formId:await makeForm(),frequency:'ONCE',occurrences:30})).status).toBe(201);
+    expect((await pool.query('SELECT id FROM checkin_assignments WHERE client_id=$1 AND due_date=$2',[person,'2027-01-01'])).rowCount).toBe(2);
+  },30000);
   it('preserves versions, drafts, snapshots and review history with atomic audits',async()=>{
     expect((await request(app).get('/coach/checkins')).status).toBe(401);
     expect((await request(app).post('/coach/checkins/forms').set('Authorization',clientToken).send({definition})).status).toBe(403);

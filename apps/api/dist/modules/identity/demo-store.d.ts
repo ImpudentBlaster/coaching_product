@@ -19,6 +19,10 @@ export declare class DemoIdentityStore {
         token: string;
         expiresAt: string;
     };
+    previewClientInvitation(token: string): {
+        email: string;
+        displayName: string;
+    };
     registerClient(input: {
         token: string;
         password: string;

@@ -1,3 +1,5 @@
+import { programSnapshot } from './program-snapshot.js';
+import { createClientSetupRouter } from './client-setup.js';
 import { createCoachCheckins, createClientCheckins } from './checkins.js';
 import { createNutritionCoachRouter, createNutritionClientRouter } from './nutrition.js';
 import { readFile } from 'node:fs/promises';
@@ -25,6 +27,7 @@ export function createMvpRouter(environment, pool) {
         return;
     } request.auth = { userId: request.auth.userId, role: row.role, approvalStatus: 'APPROVED' }; next(); }).catch(next); });
     const role = (expected) => (request, response, next) => request.auth?.role === expected ? next() : response.status(403).json({ code: 'FORBIDDEN', message: 'You do not have access to this resource' });
+    router.use('/coach/client-setup', auth, role('COACH'), createClientSetupRouter(pool));
     router.use('/coach/checkins', auth, role('COACH'), createCoachCheckins(pool));
     router.use('/client/checkins', auth, role('CLIENT'), createClientCheckins(pool));
     router.use('/coach/nutrition-library', auth, role('COACH'), createNutritionCoachRouter(pool));
@@ -154,8 +157,6 @@ async function saveProgram(pool, request, response, id) { const parsed = program
 catch {
     return response.status(409).json({ code: 'INVALID_PROGRAM', message: 'Check workout ownership and program status' });
 } }
-async function programSnapshot(c, id, coachId) { const p = await c.query(`SELECT id,name,description FROM programs WHERE id=$1 AND coach_id=$2 AND status='PUBLISHED' FOR UPDATE`, [id, coachId]); if (!p.rows[0])
-    return null; const days = await c.query(`SELECT pd.position,pd.day_label "dayLabel",wt.id "templateId",wt.name,wt.description,COALESCE(json_agg(json_build_object('exerciseId',e.external_id,'name',e.name,'instructions',e.instructions,'gifAvailable',e.gif_available,'position',wte.position,'sets',wte.sets,'repetitions',wte.repetitions,'durationSeconds',wte.duration_seconds,'restSeconds',wte.rest_seconds,'targetRpe',wte.target_rpe,'tempo',wte.tempo,'notes',wte.notes) ORDER BY wte.position) FILTER(WHERE wte.id IS NOT NULL),'[]') exercises FROM program_days pd JOIN workout_templates wt ON wt.id=pd.template_id LEFT JOIN workout_template_exercises wte ON wte.template_id=wt.id LEFT JOIN exercises e ON e.external_id=wte.exercise_external_id WHERE pd.program_id=$1 GROUP BY pd.id,wt.id ORDER BY pd.position`, [id]); return { ...p.rows[0], days: days.rows, snapshotAt: new Date().toISOString() }; }
 async function owns(pool, coachId, clientId) { return Boolean((await pool.query(`SELECT 1 FROM coach_clients cc JOIN users u ON u.id=cc.client_id WHERE cc.coach_id=$1 AND cc.client_id=$2 AND cc.status='APPROVED' AND u.account_status='APPROVED'`, [coachId, clientId])).rows[0]); }
 async function clientTenant(pool, clientId) { const r = await pool.query(`SELECT coach_id FROM coach_clients WHERE client_id=$1 AND status='APPROVED'`, [clientId]); return r.rows[0] ? { coachId: r.rows[0].coach_id, clientId } : null; }
 async function resolvePair(pool, auth, clientId) { if (auth.role === 'CLIENT')

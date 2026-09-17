@@ -10,7 +10,7 @@ const photoStorage = new PostgresCheckinPhotoStorage();
 
 class CheckinError extends Error { constructor(message: string, readonly status = 409) { super(message); } }
 type Form = { id: string; version: number; definition: Definition; isDefault: boolean };
-type Assignment = { id: string; coach_id: string; client_id: string; form_snapshot: Definition };
+type Assignment = { id: string; coach_id: string; client_id: string; form_id: string|null; form_snapshot: Definition };
 type Submission = { id: string; status: 'DRAFT'|'SUBMITTED'|'REVIEWED'; data: Answers; submitted_snapshot: Answers | null; revision: number };
 async function tx<T>(pool: Pool, work: (client: PoolClient) => Promise<T>) {
   const client = await pool.connect();
@@ -34,6 +34,12 @@ async function assignment(client: PoolClient, id: string, actor: string, coach: 
   if (!result.rows[0]) throw new CheckinError('Check-in not found',404);
   await pair(client, result.rows[0].coach_id, result.rows[0].client_id);
   return result.rows[0];
+}
+async function reserveDate(client: PoolClient, coachId: string, clientId: string, formId: string|null, date: string, exceptId?: string) {
+  // Serialize assignment and rescheduling across overlapping schedules, including concurrent requests.
+  await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`${coachId}:${clientId}`]);
+  const existing = await client.query('SELECT id FROM checkin_assignments WHERE coach_id=$1 AND client_id=$2 AND form_id IS NOT DISTINCT FROM $3::uuid AND due_date=$4 AND ($5::uuid IS NULL OR id<>$5)',[coachId,clientId,formId,date,exceptId??null]);
+  if(existing.rowCount)throw new CheckinError(`This form is already assigned to this client on ${date}. Choose another date or form.`);
 }
 const listSql = `SELECT ca.id,ca.client_id "clientId",COALESCE(cp.display_name,'Client') "clientName",ca.due_date::text "dueDate",ca.notes,ca.form_snapshot "form",ca.form_id "formId",ca.form_version "formVersion",ca.frequency,ca.schedule_id "scheduleId",COALESCE(cs.status::text,'PENDING') status,COALESCE(cs.submitted_snapshot,cs.data,'{}') data,COALESCE(cs.revision,0) revision,cs.submitted_at "submittedAt",cs.reviewed_at "reviewedAt",cs.review_status "reviewStatus",cs.review_notes "reviewNotes",cs.flags FROM checkin_assignments ca LEFT JOIN checkin_submissions cs ON cs.assignment_id=ca.id LEFT JOIN client_profiles cp ON cp.user_id=ca.client_id JOIN coach_clients cc ON cc.coach_id=ca.coach_id AND cc.client_id=ca.client_id JOIN users coach ON coach.id=ca.coach_id JOIN users person ON person.id=ca.client_id WHERE cc.status='APPROVED' AND coach.account_status='APPROVED' AND person.account_status='APPROVED'`;
 function errors(error: unknown, _request: Request, response: Response, next: NextFunction) {
@@ -117,7 +123,7 @@ export function createCoachCheckins(pool: Pool): Router {
   router.post('/forms', (request,response) => saveForm(request,response));
   router.put('/forms/:id', (request,response) => saveForm(request,response,String(request.params.id)));
   router.post('/', async (request,response) => {
-    const input = z.object({ formId: z.string().uuid().optional(), clientIds: z.array(z.string().uuid()).min(1).max(50), dueDate: dateSchema, frequency: z.literal('DAILY').default('DAILY'), occurrences: z.number().int().min(1).max(366).default(30), notes: z.string().max(2000).default('') }).strict().parse(request.body);
+    const input = z.object({ formId: z.string().uuid().optional(), clientIds: z.array(z.string().uuid()).min(1).max(50), dueDate: dateSchema, frequency: z.enum(['ONCE','DAILY','WEEKLY','BIWEEKLY','MONTHLY']).default('DAILY'), occurrences: z.number().int().min(1).max(366).default(30), notes: z.string().max(2000).default('') }).strict().parse(request.body);
     const result = await tx(pool, async client => {
       const form = await client.query<Form>(`SELECT id,version,definition FROM checkin_forms WHERE coach_id=$1 AND ${input.formId ? 'id=$2' : 'is_default=true'} FOR SHARE`,input.formId ? [request.auth!.userId,input.formId] : [request.auth!.userId]);
       if (!form.rows[0]) throw new CheckinError('Choose a published form',404);
@@ -127,6 +133,7 @@ export function createCoachCheckins(pool: Pool): Router {
       for (const clientId of [...new Set(input.clientIds)].sort()) {
         await pair(client,request.auth!.userId,clientId);
         for (const date of dates) {
+          await reserveDate(client,request.auth!.userId,clientId,form.rows[0].id,date);
           const created = await client.query<{id:string}>('INSERT INTO checkin_assignments(coach_id,client_id,due_date,notes,form_id,form_version,form_snapshot,schedule_id,frequency) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',[request.auth!.userId,clientId,date,input.notes,form.rows[0].id,form.rows[0].version,JSON.stringify(form.rows[0].definition),schedule,input.frequency]);
           ids.push(created.rows[0]!.id);
           await log(client,request.auth!.userId,'CHECKIN_ASSIGNED',created.rows[0]!.id,0,{dueDate:date,formId:form.rows[0].id,formVersion:form.rows[0].version});
@@ -141,7 +148,8 @@ export function createCoachCheckins(pool: Pool): Router {
     const id=z.string().uuid().parse(request.params.id);
     const input=z.object({dueDate:dateSchema,previousDate:dateSchema}).strict().parse(request.body);
     await tx(pool,async client=>{
-      await assignment(client,id,request.auth!.userId,true);
+      const row=await assignment(client,id,request.auth!.userId,true);
+      await reserveDate(client,row.coach_id,row.client_id,row.form_id,input.dueDate,id);
       const submitted=await client.query("SELECT id FROM checkin_submissions WHERE assignment_id=$1 AND status<>'DRAFT'",[id]);
       if(submitted.rowCount)throw new CheckinError('Submitted check-ins cannot be rescheduled');
       const updated=await client.query('UPDATE checkin_assignments SET due_date=$1 WHERE id=$2 AND due_date=$3 RETURNING id',[input.dueDate,id,input.previousDate]);

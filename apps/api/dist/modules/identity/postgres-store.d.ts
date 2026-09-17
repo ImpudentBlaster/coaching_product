@@ -4,6 +4,10 @@ export declare class PostgresIdentityStore {
     readonly pool: pg.Pool;
     constructor(databaseUrl: string);
     close(): Promise<void>;
+    previewClientInvitation(token: string): Promise<{
+        email: string;
+        displayName: string;
+    }>;
     registerCoach(input: {
         email: string;
         password: string;

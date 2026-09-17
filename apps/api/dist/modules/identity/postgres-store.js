@@ -1,3 +1,4 @@
+import { applyClientSetup, clientSetupSchema } from '../mvp/client-setup.js';
 import argon2 from 'argon2';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import pg from 'pg';
@@ -8,6 +9,16 @@ export class PostgresIdentityStore {
     pool;
     constructor(databaseUrl) { this.pool = new pg.Pool({ connectionString: databaseUrl }); }
     async close() { await this.pool.end(); }
+    async previewClientInvitation(token) {
+        const row = (await this.pool.query(`SELECT i.email::text,i.setup,i.used_at,i.revoked_at,i.expires_at,u.account_status FROM client_invitations i JOIN users u ON u.id=i.coach_id WHERE i.token_hash=$1`, [hash(token)])).rows[0];
+        if (!row || row.revoked_at)
+            throw new Error('INVALID_INVITATION');
+        if (row.used_at)
+            throw new Error('INVITATION_USED');
+        if (row.expires_at.getTime() <= Date.now() || row.account_status !== 'APPROVED')
+            throw new Error('INVALID_INVITATION');
+        return { email: row.email, displayName: [row.setup?.firstName, row.setup?.lastName].filter(Boolean).join(' ') };
+    }
     async registerCoach(input) { return this.tx(async (c) => { const hash = await argon2.hash(input.password, { type: argon2.argon2id }); const u = await c.query(`INSERT INTO users(email,password_hash,role,account_status) VALUES($1,$2,'COACH','PENDING_REVIEW') RETURNING *,NULL::text display_name,NULL::text business_name`, [input.email.trim().toLowerCase(), hash]); const row = u.rows[0]; if (!row)
         throw new Error('CREATE_FAILED'); await c.query('INSERT INTO coach_profiles(user_id,display_name,business_name) VALUES($1,$2,$3)', [row.id, input.displayName.trim(), input.businessName.trim()]); row.display_name = input.displayName.trim(); row.business_name = input.businessName.trim(); return publicUser(row); }).catch(e => { if (isUnique(e))
         throw new Error('EMAIL_EXISTS'); throw e; }); }
@@ -22,7 +33,11 @@ export class PostgresIdentityStore {
     async createClientInvitation(coachId, email) { await this.requireCoach(coachId); const token = randomBytes(32).toString('base64url'); const expiresAt = new Date(Date.now() + 604800000); const r = await this.pool.query('INSERT INTO client_invitations(coach_id,email,token_hash,expires_at) VALUES($1,$2,$3,$4) RETURNING id', [coachId, email.trim().toLowerCase(), hash(token), expiresAt]); return { invitationId: r.rows[0]?.id ?? '', token, expiresAt: expiresAt.toISOString() }; }
     async registerClient(input) { return this.tx(async (c) => { const inv = await c.query(`SELECT * FROM client_invitations WHERE token_hash=$1 FOR UPDATE`, [hash(input.token)]); const i = inv.rows[0]; if (!i || i.used_at || i.revoked_at || i.expires_at.getTime() <= Date.now())
         throw new Error('INVALID_INVITATION'); const ph = await argon2.hash(input.password, { type: argon2.argon2id }); const u = await c.query(`INSERT INTO users(email,password_hash,role,account_status) VALUES($1,$2,'CLIENT','PENDING_REVIEW') RETURNING *, $3::text display_name,NULL::text business_name`, [i.email, ph, input.displayName.trim()]); const row = u.rows[0]; if (!row)
-        throw new Error('CREATE_FAILED'); await c.query('INSERT INTO client_profiles(user_id,display_name) VALUES($1,$2)', [row.id, input.displayName.trim()]); const rel = await c.query('INSERT INTO coach_clients(coach_id,client_id) VALUES($1,$2) RETURNING id,created_at', [i.coach_id, row.id]); await c.query('UPDATE client_invitations SET used_at=now() WHERE id=$1', [i.id]); const rr = rel.rows[0]; return { user: publicUser(row), relationship: { id: rr?.id ?? '', coachId: i.coach_id, clientId: row.id, status: 'PENDING_REVIEW', rejectionReason: null, createdAt: rr?.created_at.toISOString() ?? new Date().toISOString() } }; }).catch(e => { if (isUnique(e))
+        throw new Error('CREATE_FAILED'); await c.query('INSERT INTO client_profiles(user_id,display_name) VALUES($1,$2)', [row.id, input.displayName.trim()]); const rel = await c.query('INSERT INTO coach_clients(coach_id,client_id) VALUES($1,$2) RETURNING id,created_at', [i.coach_id, row.id]); if (i.setup) {
+        const setup = clientSetupSchema.parse(i.setup);
+        await applyClientSetup(c, i.coach_id, row.id, setup);
+        row.display_name = setup.firstName + ' ' + setup.lastName;
+    } await c.query('UPDATE client_invitations SET used_at=now() WHERE id=$1', [i.id]); const rr = rel.rows[0]; return { user: publicUser(row), relationship: { id: rr?.id ?? '', coachId: i.coach_id, clientId: row.id, status: 'PENDING_REVIEW', rejectionReason: null, createdAt: rr?.created_at.toISOString() ?? new Date().toISOString() } }; }).catch(e => { if (isUnique(e))
         throw new Error('EMAIL_EXISTS'); throw e; }); }
     async listInvitations(coachId) { await this.requireCoach(coachId); const r = await this.pool.query(`SELECT id,coach_id,email::text,expires_at,used_at,revoked_at,created_at FROM client_invitations WHERE coach_id=$1 ORDER BY created_at DESC`, [coachId]); return r.rows.map(row => ({ id: row.id, coachId: row.coach_id, email: row.email, expiresAt: row.expires_at.toISOString(), usedAt: row.used_at?.toISOString() ?? null, revokedAt: row.revoked_at?.toISOString() ?? null, createdAt: row.created_at.toISOString(), status: row.revoked_at ? 'REVOKED' : row.used_at ? 'ACCEPTED' : row.expires_at.getTime() <= Date.now() ? 'EXPIRED' : 'PENDING' })); }
     async revokeInvitation(coachId, invitationId) { await this.requireCoach(coachId); const r = await this.pool.query(`UPDATE client_invitations SET revoked_at=now() WHERE id=$1 AND coach_id=$2 AND used_at IS NULL AND revoked_at IS NULL AND expires_at>now() RETURNING id,coach_id,email::text,expires_at,used_at,revoked_at,created_at`, [invitationId, coachId]); const row = r.rows[0]; if (!row)
