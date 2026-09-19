@@ -16,7 +16,7 @@ export function CoachCheckins({clients,checkins,onSaved}:{clients:ClientRelation
   async function loadForms(){try{setForms((await apiRequest<{forms:Form[]}>('/coach/checkins/forms')).forms);}catch(error){setMessage(error instanceof Error?error.message:'Unable to load forms');}}
   useEffect(()=>{void loadForms();},[]);
   const visible=checkins.filter(checkin=>(checkin.status==='SUBMITTED'||checkin.status==='REVIEWED')&&(!filter||checkin.clientId===filter)&&(status==='ALL'||checkin.status===status));
-  return <div>
+  return <div className="coach-checkins">
     {message&&<p role="status">{message}</p>}
     {editorOpen&&<EditorDialog title={editing?'Edit check-in form':'Add check-in form'} busy={dialogBusy} onClose={()=>setEditorOpen(false)}><FormBuilder key={editorKey} initial={editing} onBusy={setDialogBusy} onSaved={async()=>{await loadForms();setEditorOpen(false);setMessage('Form published. Existing assignments retain their original questions.');}}/></EditorDialog>}
     {assignOpen&&<EditorDialog title="Assign check-ins" busy={dialogBusy} onClose={()=>setAssignOpen(false)}><AssignCheckins forms={forms} clients={clients} onBusy={setDialogBusy} onSaved={async()=>{await onSaved();setAssignOpen(false);}}/></EditorDialog>}

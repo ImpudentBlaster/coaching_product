@@ -7,6 +7,7 @@ import { DemoIdentityStore } from './modules/identity/demo-store.js';
 import { PostgresIdentityStore } from './modules/identity/postgres-store.js';
 import { createIdentityRouter } from './modules/identity/router.js';
 import { createMvpRouter } from './modules/mvp/router.js';
+import { createFeedRouter } from './modules/mvp/feed.js';
 
 export async function createApp(environment: Environment): Promise<Express> {
   const app = express();
@@ -17,8 +18,9 @@ export async function createApp(environment: Environment): Promise<Express> {
   app.disable('x-powered-by');
   app.use(helmet());
   app.use(cors({ origin: environment.WEB_ORIGIN, credentials: true }));
-  app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
+  if (identityStore instanceof PostgresIdentityStore) app.use('/api/v1/feed', createFeedRouter(environment, identityStore.pool));
+  app.use(express.json({ limit: '1mb' }));
   app.use('/api/v1', createIdentityRouter(environment, identityStore));
   if (identityStore instanceof PostgresIdentityStore) app.use('/api/v1', createMvpRouter(environment, identityStore.pool));
 

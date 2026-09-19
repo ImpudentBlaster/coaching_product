@@ -10,6 +10,7 @@ import { ClientDashboard } from '../features/client/client-dashboard';
 import { CoachDashboard } from '../features/coach/coach-dashboard';
 import { CoachMvpPage } from '../features/coach/coach-mvp-page';
 import { ClientMvpPage } from '../features/client/client-mvp-page';
+import { CommunityFeed } from '../features/feed/community-feed';
 
 /* eslint-disable react-refresh/only-export-components -- route elements and router belong to one shell module */
 
@@ -25,7 +26,9 @@ export const router = createBrowserRouter([{ path: '/', element: <AuthProvider><
   { path: 'reset-password', element: <PasswordResetPage /> },
   { path: 'admin', element: <AdminDashboard /> },
   { path: 'coach', element: <CoachDashboard /> },
+  { path: 'coach/feed', element: <CommunityFeed /> },
   { path: 'coach/studio', element: <CoachMvpPage /> },
   { path: 'client', element: <ClientDashboard /> },
+  { path: 'client/feed', element: <CommunityFeed /> },
   { path: 'client/hub', element: <ClientMvpPage /> },
 ] }]);
