@@ -1,3 +1,4 @@
+import { NavigationSymbol } from './navigation-symbol';
 import { EditorDialog } from './editor-dialog';
 import { useState, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
@@ -9,6 +10,7 @@ type NavGroup = { label: string; items: NavItem[] };
 const coachNavigation: NavGroup[] = [
   { label: 'Overview', items: [{ label: 'Dashboard', to: '/coach', icon: '⌂' }] },
   { label: 'Coaching', items: [
+    { label: 'Community feed', to: '/coach/feed', icon: '✦' },
     { label: 'Clients', to: '/coach?tab=clients', icon: '♙' },
     { label: 'Check-ins', to: '/coach/studio?tab=checkins', icon: '✓' },
     { label: 'Activity', to: '/coach/studio?tab=activity', icon: '↗' },
@@ -34,6 +36,7 @@ const coachNavigation: NavGroup[] = [
 const clientNavigation: NavGroup[] = [
   { label: 'Overview', items: [{ label: 'Today', to: '/client', icon: '⌂' }] },
   { label: 'My coaching', items: [
+    { label: 'Community feed', to: '/client/feed', icon: '✦' },
     { label: 'My plan', to: '/client/hub?tab=program', icon: '▤' },
     { label: 'Nutrition', to: '/client/hub?tab=nutrition', icon: '◒' },
     { label: 'Progress', to: '/client/hub?tab=progress', icon: '↗' },
@@ -58,7 +61,7 @@ function Sidebar({ groups, name, role, onLogout }: { groups: NavGroup[]; name: s
   return <aside className="app-sidebar">
     <Link className="sidebar-brand" to={role === 'COACH' ? '/coach' : role === 'CLIENT' ? '/client' : '/admin'}><span className="brand-mark">F</span><span>Forme<b>.</b></span></Link>
     <nav className="sidebar-nav" aria-label={`${role.toLowerCase()} navigation`}>
-      {groups.map((group) => <section className={group.label === 'Nutrition' ? 'nav-group nutrition-nav-group' : 'nav-group'} key={group.label}><p>{group.label}</p>{group.items.map((item) => <Link aria-current={isCurrent(location.pathname, location.search, item.to) ? 'page' : undefined} className={isCurrent(location.pathname, location.search, item.to) ? 'sidebar-link active' : 'sidebar-link'} key={item.label} to={item.to}><span className="nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span></Link>)}</section>)}
+      {groups.map((group) => <section className={group.label === 'Nutrition' ? 'nav-group nutrition-nav-group' : 'nav-group'} key={group.label}><p>{group.label}</p>{group.items.map((item) => <Link aria-current={isCurrent(location.pathname, location.search, item.to) ? 'page' : undefined} className={isCurrent(location.pathname, location.search, item.to) ? 'sidebar-link active' : 'sidebar-link'} key={item.label} to={item.to}><span className="nav-icon" aria-hidden="true"><NavigationSymbol symbol={item.icon}/></span><span>{item.label}</span></Link>)}</section>)}
     </nav>
     <div className="sidebar-account"><div className="avatar">{name.charAt(0).toUpperCase()}</div><div><strong>{name}</strong><span>{role === 'PLATFORM_ADMIN' ? 'Platform admin' : role.toLowerCase()}</span></div><button onClick={onLogout} title="Sign out" aria-label="Sign out">↪</button></div>
   </aside>;
@@ -69,7 +72,7 @@ function MobileNav({ groups }: { groups: NavGroup[] }) {
   const [open,setOpen]=useState(false);
  const {logout}=useAuth();
  const items = groups.flatMap((group) => group.items).slice(0, 4);
-  return <><nav className="mobile-nav" aria-label="Mobile navigation">{items.map((item) => <Link aria-current={isCurrent(location.pathname, location.search, item.to) ? 'page' : undefined} className={isCurrent(location.pathname, location.search, item.to) ? 'active' : ''} key={item.label} to={item.to}><span aria-hidden="true">{item.icon}</span><small>{item.label}</small></Link>)}<button onClick={()=>setOpen(true)} aria-label="Open all navigation"><span>☰</span><small>Menu</small></button></nav>{open&&<EditorDialog title="Navigation" onClose={()=>setOpen(false)}><nav className="mobile-full-menu" aria-label="All pages">{groups.map(group=><section key={group.label}><h3>{group.label}</h3>{group.items.map(item=><Link key={item.to} to={item.to} onClick={()=>setOpen(false)} aria-current={isCurrent(location.pathname,location.search,item.to)?'page':undefined}>{item.label}</Link>)}</section>)}<button className="secondary" onClick={()=>{setOpen(false);void logout();}}>Sign out</button></nav></EditorDialog>}</>;
+  return <><nav className="mobile-nav" aria-label="Mobile navigation">{items.map((item) => <Link aria-current={isCurrent(location.pathname, location.search, item.to) ? 'page' : undefined} className={isCurrent(location.pathname, location.search, item.to) ? 'active' : ''} key={item.label} to={item.to}><span aria-hidden="true"><NavigationSymbol symbol={item.icon}/></span><small>{item.label}</small></Link>)}<button onClick={()=>setOpen(true)} aria-label="Open all navigation"><span>☰</span><small>Menu</small></button></nav>{open&&<EditorDialog title="Navigation" onClose={()=>setOpen(false)}><nav className="mobile-full-menu" aria-label="All pages">{groups.map(group=><section key={group.label}><h3>{group.label}</h3>{group.items.map(item=><Link key={item.to} to={item.to} onClick={()=>setOpen(false)} aria-current={isCurrent(location.pathname,location.search,item.to)?'page':undefined}>{item.label}</Link>)}</section>)}<button className="secondary" onClick={()=>{setOpen(false);void logout();}}>Sign out</button></nav></EditorDialog>}</>;
 }
 
 function isCurrent(pathname: string, search: string, to: string) {
