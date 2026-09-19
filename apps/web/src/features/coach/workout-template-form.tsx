@@ -1,6 +1,7 @@
 import { Notice } from '../../components/editor-dialog';
 import { useState, type FormEvent } from 'react';
 import { apiRequest, type Exercise, type WorkoutTemplate } from '../../lib/api';
+import { ExerciseSelect } from './exercise-select';
 
 export function WorkoutTemplateForm({ exercises, onSaved, onMessage, initial, onBusy }: {
   exercises: Exercise[];
@@ -54,10 +55,7 @@ export function WorkoutTemplateForm({ exercises, onSaved, onMessage, initial, on
     <label>Description<textarea name="description" defaultValue={initial?.description} maxLength={2000} disabled={saving}/></label>
     {rows.map((id, index) => <fieldset className="vertical" key={id} disabled={saving}>
       <legend>Exercise {index + 1}</legend>
-      <label>Exercise<select name={`${id}-exercise`} required defaultValue={initial?.exercises[Number(id)]?.exerciseId??''}>
-        <option value="">Choose exercise</option>{initial?.exercises[Number(id)]&&!exercises.some(e=>e.id===initial.exercises[Number(id)]?.exerciseId)&&<option value={initial.exercises[Number(id)]!.exerciseId}>{initial.exercises[Number(id)]!.name}</option>}
-        {exercises.map(exercise => <option key={exercise.id} value={exercise.id}>{exercise.name} · {exercise.target}</option>)}
-      </select></label>
+      <ExerciseSelect name={`${id}-exercise`} index={index + 1} exercises={exercises} initialId={initial?.exercises[Number(id)]?.exerciseId ?? ''} initialName={initial?.exercises[Number(id)]?.name ?? ''} />
       <div className="form-row">
         <label>Sets<input name={`${id}-sets`} type="number" min="1" max="100" defaultValue={initial?.exercises[Number(id)]?.sets??3} required/></label>
         <label>Reps<input name={`${id}-repetitions`} type="number" min="0" defaultValue={initial?.exercises[Number(id)]?.repetitions??10} required/></label>

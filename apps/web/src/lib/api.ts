@@ -25,12 +25,12 @@ export type AuditEvent = {
   metadata: Record<string, unknown>; createdAt: string;
 };
 
-export type Exercise = { id:string;name:string;bodyPart:string;equipment:string;target:string;secondaryMuscles:string[];instructions:string[];gifAvailable:boolean };
+export type Exercise = { id:string;name:string;bodyPart:string;equipment:string;target:string;secondaryMuscles:string[];instructions:string[];gifAvailable:boolean;custom?:boolean };
 export type WorkoutTemplate = { id:string;name:string;description:string;archived_at:string|null;exercises:Array<{exerciseId:string;name:string;position:number;sets:number;repetitions:number|null;durationSeconds:number|null;restSeconds:number;targetRpe:number|null;tempo:string|null;notes:string|null;instructions?:string[];gifAvailable?:boolean}> };
 export type Program = { id:string;name:string;description:string;status:'DRAFT'|'PUBLISHED'|'ARCHIVED';days:Array<{templateId:string;templateName:string;dayLabel:string;position:number}> };
 export type ProgramAssignment = { id:string;programId:string;snapshot:{name:string;description:string;days:Array<{dayLabel:string;name:string;exercises:WorkoutTemplate['exercises']}>};assignedAt:string };
 
-const apiUrl = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:3000/api/v1';
+const apiUrl = (import.meta.env.VITE_API_URL || '/api/v1').replace(/\/$/, '');
 let accessToken: string | null = null;
 let refreshRequest: Promise<void> | null = null;
 
