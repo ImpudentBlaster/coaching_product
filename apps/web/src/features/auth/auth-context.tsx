@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { apiRequest, setAccessToken, type User } from '../../lib/api';
+import { apiRequest, refreshSession, SessionExpiredError, setAccessToken, type User } from '../../lib/api';
 
 /* eslint-disable react-refresh/only-export-components -- provider and hook form one authentication boundary */
 
@@ -16,7 +16,18 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
-  useEffect(() => { void apiRequest<{ accessToken: string; user: User }>('/auth/refresh', { method: 'POST' }).then((result) => { setAccessToken(result.accessToken); setUser(result.user); }).catch(() => { setAccessToken(null); }).finally(() => setReady(true)); }, []);
+  const [restoreError, setRestoreError] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setReady(false); setRestoreError('');
+    void refreshSession().then(result => { if (active) { setUser(result.user); setReady(true); } }).catch(error => {
+      if (!active) return;
+      if (error instanceof SessionExpiredError) { setUser(null); setReady(true); }
+      else setRestoreError('We couldn’t reconnect to your session. Check your connection and try again.');
+    });
+    return () => { active = false; };
+  }, [attempt]);
   const value = useMemo<AuthContextValue>(() => ({
     user, ready,
     async login(email, password) {
@@ -29,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     logout() { void apiRequest('/auth/logout', { method: 'POST' }).finally(() => { setAccessToken(null); setUser(null); }); },
   }), [ready, user]);
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>{ready ? children : restoreError ? <section className="card status-page"><p role="alert">{restoreError}</p><button className="primary" onClick={() => setAttempt(value => value + 1)}>Retry connection</button></section> : <p className="helper" role="status">Restoring your session…</p>}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

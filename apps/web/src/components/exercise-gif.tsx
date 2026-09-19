@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiBlob } from '../lib/api';
+import { LoadingImage } from './loading-image';
 
 export function ExerciseGif({ id, name, available = true }: { id: string; name: string; available?: boolean }) {
   return <ExerciseAnimation key={`${id}-${available}`} id={id} name={name} available={available} />;
@@ -18,5 +19,5 @@ function ExerciseAnimation({ id, name, available }: { id: string; name: string; 
   }, [id, available, retry]);
   return <div className="exercise-media">{failed
     ? <div><span>{available ? 'Animation could not load' : 'No animation available'}</span><button className="secondary small" type="button" onClick={() => setRetry(value => value + 1)} aria-label={`Retry animation for ${name}`}>Retry animation</button></div>
-    : url ? <img loading="lazy" src={url} alt={`${name} demonstration`} onError={() => setFailed(true)} /> : <span role="status">Loading animation…</span>}</div>;
+    : <LoadingImage src={url} alt={`${name} demonstration`} onError={() => setFailed(true)} />}</div>;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { apiRequest, type Exercise } from '../../lib/api';
 import { Notice } from '../../components/editor-dialog';
+import { LoadingImage } from '../../components/loading-image';
 
 type Filters = { bodyParts: string[]; equipment: string[]; targets: string[] };
 function readGif(file: File): Promise<string> {
@@ -47,7 +48,7 @@ export function ExerciseForm({ onSaved, onBusy }: { onSaved: (exercise: Exercise
         if (file && (!file.size || file.size > 8 * 1024 * 1024 || !/\.gif$/i.test(file.name))) { setError('Choose a GIF file up to 8 MB.'); event.target.value = ''; return; }
         setGif(file ?? null); event.target.value = '';
       }} /><small>Up to 8 MB, 200 frames. Instructions remain available without an animation.</small></label>
-      {preview && <div className="exercise-upload-preview"><img src={preview} alt="New exercise animation preview" /><span>{gif?.name}</span><button className="secondary" type="button" onClick={() => setGif(null)}>Remove animation</button></div>}
+      {gif && <div className="exercise-upload-preview"><LoadingImage src={preview} alt="New exercise animation preview" /><span>{gif.name}</span><button className="secondary" type="button" onClick={() => setGif(null)}>Remove animation</button></div>}
     </fieldset>
     <button className="primary" type="submit" disabled={saving}>{saving ? 'Saving exercise…' : 'Save exercise'}</button>
   </form>;

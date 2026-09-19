@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { apiBlob, apiRequest } from '../../lib/api';
 import { useAuth } from '../auth/auth-context';
+import { LoadingImage } from '../../components/loading-image';
 import './feed.css';
 
 type Attachment = { id: string; name: string; mediaType: string; size: number };
@@ -105,7 +106,7 @@ function Composer({ name, onPosted }: { name: string; onPosted: () => void }) {
 function DraftFile({ file }: { file: File }) {
   const [url, setUrl] = useState('');
   useEffect(() => { if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return; const next = URL.createObjectURL(file); setUrl(next); return () => URL.revokeObjectURL(next); }, [file]);
-  return url ? <img src={url} alt="Selected attachment preview" /> : <span aria-hidden="true">▤</span>;
+  return /^image\/(jpeg|png|webp)$/.test(file.type) ? <LoadingImage src={url} alt="Selected attachment preview" /> : <span aria-hidden="true">▤</span>;
 }
 
 function PrivateAttachment({ postId, attachment }: { postId: string; attachment: Attachment }) {
@@ -118,7 +119,7 @@ function PrivateAttachment({ postId, attachment }: { postId: string; attachment:
   useEffect(() => {
     if (!image) return;
     let active = true, objectUrl = '';
-    setError('');
+    setError(''); setUrl('');
     void apiBlob(path).then(blob => { if (active) { objectUrl = URL.createObjectURL(blob); setUrl(objectUrl); } }).catch(error => { if (active) setError(message(error)); });
     return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [image, path, retry]);
@@ -131,7 +132,7 @@ function PrivateAttachment({ postId, attachment }: { postId: string; attachment:
     } catch (error) { setError(message(error)); } finally { setBusy(false); }
   }
   return <div className={image ? 'feed-photo' : 'feed-file'}>
-    {image && (url ? <img src={url} alt={attachment.name} loading="lazy" /> : !error && <p role="status">Loading photo…</p>)}
+    {image && !error && <LoadingImage src={url} alt={attachment.name} onError={() => setError('Unable to display this photo.')} />}
     <button type="button" disabled={busy} onClick={() => void download()} aria-label={`Download ${attachment.name}`}><span aria-hidden="true">↓</span><span>{attachment.name}<small>{formatSize(attachment.size)} · {busy ? 'Downloading…' : 'Download'}</small></span></button>
     {error && <p className="error" role="alert">{error} {image && <button onClick={() => setRetry(value => value + 1)}>Retry photo</button>}</p>}
   </div>;

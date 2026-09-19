@@ -9,7 +9,7 @@ describe('application shell', () => {
   it('renders the public home', async () => {
     const memoryRouter = createMemoryRouter(router.routes, { initialEntries: ['/'] });
     render(<RouterProvider router={memoryRouter} />);
-    expect(screen.getByRole('heading', { name: /focused home/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /focused home/i })).toBeInTheDocument();
     await waitFor(() => expect(screen.getAllByRole('link', { name: 'Sign in' })).toHaveLength(2));
   });
 });

@@ -32,15 +32,30 @@ export type ProgramAssignment = { id:string;programId:string;snapshot:{name:stri
 
 const apiUrl = (import.meta.env.VITE_API_URL || '/api/v1').replace(/\/$/, '');
 let accessToken: string | null = null;
-let refreshRequest: Promise<void> | null = null;
+type Session = { accessToken: string; user: User };
+let refreshRequest: Promise<Session> | null = null;
+
+export class SessionExpiredError extends Error {}
+
+// Startup and expired API/media requests must share a refresh operation. In
+// particular, StrictMode's repeated mount effect must not rotate one cookie twice.
+export function refreshSession(): Promise<Session> {
+  refreshRequest ??= (async () => {
+    if (typeof navigator !== 'undefined' && navigator.locks) {
+      // Cookies are shared across tabs; serialize rotation across those tabs too.
+      return navigator.locks.request(`coaching-session:${apiUrl}`, refreshAccessToken);
+    }
+    return refreshAccessToken();
+  })().finally(() => { refreshRequest = null; });
+  return refreshRequest;
+}
 
 export function setAccessToken(token: string | null): void { accessToken = token; }
 
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response = await send(path, init);
   if (response.status === 401 && !path.startsWith('/auth/')) {
-    refreshRequest ??= refreshAccessToken().finally(() => { refreshRequest = null; });
-    await refreshRequest;
+    await refreshSession();
     response = await send(path, init);
   }
   const text = await response.text();
@@ -61,17 +76,18 @@ async function send(path: string, init: RequestInit): Promise<Response> {
 export async function apiBlob(path:string):Promise<Blob> {
   let response=await send(path,{});
   if(response.status===401){
-    refreshRequest??=refreshAccessToken().finally(()=>{refreshRequest=null;});
-    await refreshRequest;
+    await refreshSession();
     response=await send(path,{});
   }
   if(!response.ok)throw new Error('Unable to load this private photo.');
   return response.blob();
 }
 
-async function refreshAccessToken(): Promise<void> {
+async function refreshAccessToken(): Promise<Session> {
   const response = await fetch(`${apiUrl}/auth/refresh`, { method: 'POST', credentials: 'include' });
-  if (!response.ok) { accessToken = null; throw new Error('Your session expired. Please sign in again.'); }
-  const result = await response.json() as { accessToken: string };
+  if (response.status === 401) { accessToken = null; throw new SessionExpiredError('Your session expired. Please sign in again.'); }
+  if (!response.ok) throw new Error('Unable to restore your session. Please try again.');
+  const result = await response.json() as Session;
   accessToken = result.accessToken;
+  return result;
 }

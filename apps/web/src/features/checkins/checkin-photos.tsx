@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiBlob, apiRequest } from '../../lib/api';
+import { ImagePlaceholder, LoadingImage } from '../../components/loading-image';
 
 type Photo={id:string;createdAt:string};
 export function CheckinPhotos({id,coach=false,locked=false,disabled=false,onBusyChange}:{id:string;coach?:boolean;locked?:boolean;disabled?:boolean;onBusyChange?:(busy:boolean)=>void}) {
@@ -32,11 +33,11 @@ export function CheckinPhotos({id,coach=false,locked=false,disabled=false,onBusy
     {!locked&&!coach&&<><p>Upload at least one photo to submit. JPEG, PNG or WebP, up to 8 MB each; maximum 5 photos. Visible only to you and your approved coach.</p><label>Add a photo<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy||disabled||photos.length>=5} onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file)void upload(file);}}/></label></>}
     {busy&&<p role="status">Saving photo…</p>}{message&&<p role="alert">{message}</p>}
     {loaded&&photos.length===0&&<p>{locked||coach?'No photos attached.':'No photos uploaded yet.'}</p>}
-    <div className="checkin-photo-grid">{photos.map(photo=><div key={photo.id}><PrivatePhoto path={`${path}/${photo.id}`}/>{!locked&&!coach&&<button type="button" className="danger" disabled={busy||disabled} onClick={()=>void remove(photo.id)}>Remove photo</button>}</div>)}</div>
+    <div className="checkin-photo-grid">{!loaded&&!message&&<ImagePlaceholder label="Loading check-in photos"/>}{photos.map(photo=><div key={photo.id}><PrivatePhoto path={`${path}/${photo.id}`}/>{!locked&&!coach&&<button type="button" className="danger" disabled={busy||disabled} onClick={()=>void remove(photo.id)}>Remove photo</button>}</div>)}</div>
   </section>;
 }
 function PrivatePhoto({path}:{path:string}){
   const [url,setUrl]=useState('');const[error,setError]=useState('');
   useEffect(()=>{let active=true;let objectUrl='';void apiBlob(path).then(blob=>{if(active){objectUrl=URL.createObjectURL(blob);setUrl(objectUrl);}}).catch(()=>{if(active)setError('Unable to load photo.');});return()=>{active=false;if(objectUrl)URL.revokeObjectURL(objectUrl);};},[path]);
-  return url?<a href={url} target="_blank" rel="noreferrer"><img className="checkin-photo" src={url} alt="Private check-in photo"/></a>:<p>{error||'Loading photo…'}</p>;
+  return error?<p role="alert">{error}</p>:url?<a href={url} target="_blank" rel="noreferrer"><LoadingImage src={url} alt="Private check-in photo" onError={()=>setError('Unable to load photo.')}/></a>:<LoadingImage alt="Private check-in photo"/>;
 }
