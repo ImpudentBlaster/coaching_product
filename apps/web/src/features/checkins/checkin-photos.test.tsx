@@ -20,7 +20,8 @@ it('fetches photos with authorization and releases blob URLs on unmount',async()
   vi.mocked(apiRequest).mockResolvedValue({photos:[{id:'photo',createdAt:'2026-09-15'}]});
   vi.mocked(apiBlob).mockResolvedValue(new Blob(['image'],{type:'image/jpeg'}));
   const rendered=render(<CheckinPhotos id="checkin" coach locked/>);
-  await screen.findByRole('img',{name:'Private check-in photo'});
+  fireEvent.load(await screen.findByAltText('Private check-in photo'));
+  expect(screen.getByRole('img',{name:'Private check-in photo'})).toBeVisible();
   expect(apiBlob).toHaveBeenCalledWith('/coach/checkins/checkin/photos/photo');
   expect(screen.queryByLabelText('Add a photo')).not.toBeInTheDocument();
   rendered.unmount();expect(revokeObjectURL).toHaveBeenCalledWith('blob:private-photo');

@@ -1,5 +1,6 @@
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { DemoIdentityStore } from './modules/identity/demo-store.js';
 import { createApp } from './app.js';
 import type { Environment } from './config/environment.js';
 import type { PublicUser } from './modules/identity/types.js';
@@ -110,6 +111,27 @@ describe('coach approval flow', () => {
 });
 
 describe('refresh session security', () => {
+  it('restores a session from its persistent cookie without an access token', async () => {
+    const login = await request(app).post('/api/v1/auth/login').send({ email: environment.DEMO_ADMIN_EMAIL, password: environment.DEMO_ADMIN_PASSWORD });
+    const cookie = String(login.headers['set-cookie']?.[0]);
+    expect(cookie).toContain('Max-Age=2592000');
+    expect(cookie).toContain('HttpOnly');
+    const reopened = await request(app).post('/api/v1/auth/refresh').set('cookie', cookie);
+    expect(reopened.status).toBe(200);
+    const token = (reopened.body as { accessToken: string }).accessToken;
+    expect((await request(app).get('/api/v1/auth/me').set('Authorization', `Bearer ${token}`)).status).toBe(200);
+  });
+  it('does not clear a valid cookie when refresh encounters a temporary server failure', async () => {
+    const login = await request(app).post('/api/v1/auth/login').send({ email: environment.DEMO_ADMIN_EMAIL, password: environment.DEMO_ADMIN_PASSWORD });
+    const cookie = String(login.headers['set-cookie']?.[0]);
+    const rotate = vi.spyOn(DemoIdentityStore.prototype, 'rotateRefreshSession').mockImplementationOnce(() => { throw new Error('Temporarily unavailable'); });
+    try {
+      const failed = await request(app).post('/api/v1/auth/refresh').set('cookie', cookie);
+      expect(failed.status).toBe(500);
+      expect(failed.headers['set-cookie']).toBeUndefined();
+    } finally { rotate.mockRestore(); }
+    expect((await request(app).post('/api/v1/auth/refresh').set('cookie', cookie)).status).toBe(200);
+  });
   it('rotates refresh tokens and revokes the family when an old token is replayed', async () => {
     const login = await request(app).post('/api/v1/auth/login').send({ email: environment.DEMO_ADMIN_EMAIL, password: environment.DEMO_ADMIN_PASSWORD });
     const firstCookie = login.headers['set-cookie']?.[0]; expect(firstCookie).toBeTruthy();

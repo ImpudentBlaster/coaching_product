@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth-context';
 
 export function LoginPage() {
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,6 +28,7 @@ export function LoginPage() {
       setBusy(false);
     }
   }
+  if (user) return <Navigate to={user.role === 'PLATFORM_ADMIN' ? '/admin' : user.role === 'COACH' ? '/coach' : '/client'} replace />;
   return (
     <div className="auth-grid">
       <section>

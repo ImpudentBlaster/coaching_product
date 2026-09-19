@@ -60,7 +60,10 @@ export function createIdentityRouter(environment: Environment, store: IdentitySt
     const token = getRefreshCookie(request);
     if (!token) return response.status(401).json({ code: 'UNAUTHENTICATED', message: 'Authentication required' });
     try { const rotated = await store.rotateRefreshSession(token); setRefreshCookie(response, rotated.token, environment); return response.json({ accessToken: issueAccessToken(environment, rotated.user), user: toPublicUser(rotated.user) }); }
-    catch { clearRefreshCookie(response, environment); return response.status(401).json({ code: 'UNAUTHENTICATED', message: 'Authentication required' }); }
+    catch (error) {
+      if (!(error instanceof Error) || !['INVALID_REFRESH', 'REFRESH_REUSE'].includes(error.message)) throw error;
+      clearRefreshCookie(response, environment); return response.status(401).json({ code: 'UNAUTHENTICATED', message: 'Authentication required' });
+    }
   });
 
   router.post('/auth/logout', async (request, response) => { const token = getRefreshCookie(request); if (token) await store.revokeRefreshToken(token); clearRefreshCookie(response, environment); return response.status(204).send(); });
