@@ -1,3 +1,6 @@
+import { ClientProfilePage } from '../features/coach/client-profile-page';
+import { ClientOnboardingGate } from '../features/client/client-onboarding-gate';
+import { ClientOnboardingPage } from '../features/client/client-onboarding-page';
 import { Link, Navigate, createBrowserRouter } from 'react-router-dom';
 import { AppLayout } from '../components/app-layout';
 import { AdminDashboard } from '../features/admin/admin-dashboard';
@@ -28,9 +31,13 @@ export const router = createBrowserRouter([{ path: '/', element: <AuthProvider><
   { path: 'reset-password', element: <PasswordResetPage /> },
   { path: 'admin', element: <AdminDashboard /> },
   { path: 'coach', element: <CoachDashboard /> },
+  { path: 'coach/clients/:clientId', element: <ClientProfilePage /> },
   { path: 'coach/feed', element: <CommunityFeed /> },
   { path: 'coach/studio', element: <CoachMvpPage /> },
-  { path: 'client', element: <ClientDashboard /> },
-  { path: 'client/feed', element: <CommunityFeed /> },
-  { path: 'client/hub', element: <ClientMvpPage /> },
+  { path: 'client', element: <ClientOnboardingGate />, children: [
+    { index: true, element: <ClientDashboard /> },
+    { path: 'onboarding', element: <ClientOnboardingPage /> },
+    { path: 'feed', element: <CommunityFeed /> },
+    { path: 'hub', element: <ClientMvpPage /> },
+  ] },
 ] }]);

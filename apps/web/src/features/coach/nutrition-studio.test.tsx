@@ -31,7 +31,7 @@ it('creates a meal with multiple food quantities and correct live totals', async
 });
 
 it('guides an empty library through the required hierarchy', async () => {
-  vi.mocked(apiRequest).mockResolvedValue({ entries: [], assignments: [] });
+  vi.mocked(apiRequest).mockImplementation(async path => path.endsWith('/catalog') ? { foods: [] } : { entries: [], assignments: [] });
   render(<MemoryRouter initialEntries={['/coach/studio?tab=nutrition']}><NutritionStudio clients={[]}/></MemoryRouter>);
   fireEvent.click(await screen.findByRole('button', { name: 'Add plan' }));
   expect(screen.getByRole('button', { name: 'Create plan' })).toBeDisabled();

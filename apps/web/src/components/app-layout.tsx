@@ -5,29 +5,29 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/auth/auth-context';
 
 type NavItem = { label: string; to: string; icon: string };
-type NavGroup = { label: string; items: NavItem[] };
+type NavGroup = { label: string; icon?: string; items: NavItem[] };
 
 const coachNavigation: NavGroup[] = [
   { label: 'Overview', items: [{ label: 'Dashboard', to: '/coach', icon: '⌂' }] },
-  { label: 'Coaching', items: [
+  { label: 'Coaching', icon: '♙', items: [
     { label: 'Community feed', to: '/coach/feed', icon: '✦' },
     { label: 'Clients', to: '/coach?tab=clients', icon: '♙' },
     { label: 'Check-ins', to: '/coach/studio?tab=checkins', icon: '✓' },
     { label: 'Activity', to: '/coach/studio?tab=activity', icon: '↗' },
     { label: 'Feedback', to: '/coach/studio?tab=clients', icon: '✦' },
   ] },
-  { label: 'Nutrition', items: [
+  { label: 'Nutrition', icon: '⌁', items: [
     { label: 'Plans', to: '/coach/studio?tab=nutrition&section=plans', icon: '▤' },
     { label: 'Days', to: '/coach/studio?tab=nutrition&section=days', icon: '▦' },
     { label: 'Meals', to: '/coach/studio?tab=nutrition&section=meals', icon: '◒' },
     { label: 'Foods', to: '/coach/studio?tab=nutrition&section=foods', icon: '⌁' },
   ] },
-  { label: 'Training', items: [
+  { label: 'Training', icon: '◫', items: [
     { label: 'Programs', to: '/coach/studio?tab=programs', icon: '▤' },
     { label: 'Workouts', to: '/coach/studio?tab=workouts', icon: '◫' },
     { label: 'Exercises', to: '/coach/studio?tab=exercises', icon: '⌁' },
   ] },
-  { label: 'Workspace', items: [
+  { label: 'Workspace', icon: '⚙', items: [
     { label: 'Invitations', to: '/coach?tab=invitations', icon: '＋' },
     { label: 'Settings', to: '/coach?tab=profile', icon: '⚙' },
   ] },
@@ -35,7 +35,7 @@ const coachNavigation: NavGroup[] = [
 
 const clientNavigation: NavGroup[] = [
   { label: 'Overview', items: [{ label: 'Today', to: '/client', icon: '⌂' }] },
-  { label: 'My coaching', items: [
+  { label: 'My coaching', icon: '◫', items: [
     { label: 'Community feed', to: '/client/feed', icon: '✦' },
     { label: 'My plan', to: '/client/hub?tab=program', icon: '▤' },
     { label: 'Nutrition', to: '/client/hub?tab=nutrition', icon: '◒' },
@@ -43,8 +43,8 @@ const clientNavigation: NavGroup[] = [
     { label: 'Check-ins', to: '/client/hub?tab=checkins', icon: '✓' },
     { label: 'Coach messages', to: '/client/hub?tab=feedback', icon: '✦' },
   ] },
-  { label: 'Account', items: [
-    { label: 'My profile', to: '/client/hub?tab=onboarding', icon: '♙' },
+  { label: 'Account', icon: '♙', items: [
+    { label: 'My profile', to: '/client/onboarding', icon: '♙' },
     { label: 'Membership', to: '/client/hub?tab=subscription', icon: '◇' },
   ] },
 ];
@@ -58,10 +58,41 @@ const adminNavigation: NavGroup[] = [{ label: 'Platform', items: [
 
 function Sidebar({ groups, name, role, onLogout }: { groups: NavGroup[]; name: string; role: string; onLogout: () => void }) {
   const location = useLocation();
-  return <aside className="app-sidebar">
-    <Link className="sidebar-brand" to={role === 'COACH' ? '/coach' : role === 'CLIENT' ? '/client' : '/admin'}><span className="brand-mark">F</span><span>Forme<b>.</b></span></Link>
+  const [hovered, setHovered] = useState(false);
+  const [keyboardFocus, setKeyboardFocus] = useState(false);
+  const current = (item: NavItem) => isCurrent(location.pathname, location.search, item.to);
+  const expanded = hovered || keyboardFocus;
+  const renderLink = (item: NavItem, nested = false) => <Link
+    aria-current={current(item) ? 'page' : undefined}
+    aria-label={item.label}
+    title={item.label}
+    className={`sidebar-link${current(item) ? ' active' : ''}`}
+    key={item.to}
+    to={item.to}
+  >{!nested && <span className="nav-icon" aria-hidden="true"><NavigationSymbol symbol={item.icon}/></span>}<span className="sidebar-label">{item.label}</span></Link>;
+  return <aside className="app-sidebar" data-expanded={expanded}
+    onPointerEnter={event => { if (event.pointerType !== 'touch') setHovered(true); }}
+    onPointerLeave={() => setHovered(false)}
+    onFocusCapture={event => { if (event.target.matches(':focus-visible')) setKeyboardFocus(true); }}
+    onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setKeyboardFocus(false); }}
+  >
+    <Link className="sidebar-brand" aria-label="Forme home" to={role === 'COACH' ? '/coach' : role === 'CLIENT' ? '/client' : '/admin'}><span className="brand-mark" aria-hidden="true">F</span><span>Forme<b>.</b></span></Link>
     <nav className="sidebar-nav" aria-label={`${role.toLowerCase()} navigation`}>
-      {groups.map((group) => <section className={group.label === 'Nutrition' ? 'nav-group nutrition-nav-group' : 'nav-group'} key={group.label}><p>{group.label}</p>{group.items.map((item) => <Link aria-current={isCurrent(location.pathname, location.search, item.to) ? 'page' : undefined} className={isCurrent(location.pathname, location.search, item.to) ? 'sidebar-link active' : 'sidebar-link'} key={item.label} to={item.to}><span className="nav-icon" aria-hidden="true"><NavigationSymbol symbol={item.icon}/></span><span>{item.label}</span></Link>)}</section>)}
+      {groups.map((group, index) => {
+        if (!group.icon) return group.items.map(item => renderLink(item));
+        const submenuId = `sidebar-submenu-${index}`;
+        return <section className="sidebar-group" key={group.label}>
+          <button type="button" className={`sidebar-link sidebar-group-toggle${group.items.some(current) ? ' active' : ''}`}
+            aria-label={group.label} title={group.label} aria-expanded={expanded} aria-controls={submenuId}
+            onClick={() => {
+              if (!expanded) setKeyboardFocus(true);
+            }}>
+            <span className="nav-icon" aria-hidden="true"><NavigationSymbol symbol={group.icon}/></span>
+            <span className="sidebar-label">{group.label}</span>
+          </button>
+          <div className="sidebar-submenu" id={submenuId} hidden={!expanded}>{group.items.map(item => renderLink(item, true))}</div>
+        </section>;
+      })}
     </nav>
     <div className="sidebar-account"><div className="avatar">{name.charAt(0).toUpperCase()}</div><div><strong>{name}</strong><span>{role === 'PLATFORM_ADMIN' ? 'Platform admin' : role.toLowerCase()}</span></div><button onClick={onLogout} title="Sign out" aria-label="Sign out">↪</button></div>
   </aside>;
@@ -77,6 +108,7 @@ function MobileNav({ groups }: { groups: NavGroup[] }) {
 
 function isCurrent(pathname: string, search: string, to: string) {
   const [targetPath, targetSearch = ''] = to.split('?');
+  if (to === '/coach?tab=clients' && pathname.startsWith('/coach/clients/')) return true;
   if (pathname !== targetPath) return false;
   const current = new URLSearchParams(search);
   const target = new URLSearchParams(targetSearch);

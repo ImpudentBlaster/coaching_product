@@ -1,0 +1,23 @@
+import '@testing-library/jest-dom/vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import { ActionMenu } from './action-menu';
+afterEach(cleanup);
+it('opens with keyboard, navigates options, closes on Escape and outside clicks', () => {
+  const edit = vi.fn();
+  render(<ActionMenu name="Workout" items={[{ label: 'Edit', onSelect: edit }, { label: 'Delete', onSelect: vi.fn() }]}/>);
+  const trigger = screen.getByRole('button', { name: 'Actions for Workout' });
+  fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+  expect(screen.getByRole('menuitem', { name: 'Edit' })).toHaveFocus();
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'ArrowDown' });
+  expect(screen.getByRole('menuitem', { name: 'Delete' })).toHaveFocus();
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  expect(trigger).toHaveFocus();
+  expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  fireEvent.click(trigger);
+  fireEvent.pointerDown(document.body);
+  expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  fireEvent.click(trigger);
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+  expect(edit).toHaveBeenCalledOnce();
+});

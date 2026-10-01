@@ -1,3 +1,4 @@
+import { FoodCatalog } from './food-catalog';
 import { Collection } from '../../components/collection';
 
 import { EditorDialog, Notice } from '../../components/editor-dialog';
@@ -69,6 +70,8 @@ export function NutritionStudio({ clients }: { clients: ClientRelationship[] }) 
     <Notice message={message} onClear={()=>setMessage('')}/>
 
     {editing!==undefined&&<EditorDialog title={`${editing?'Edit':'Add'} ${labels[kind]}`} busy={dialogBusy} onClose={()=>setEditing(undefined)}><NutritionBuilder key={editing?.id??kind} initial={editing??undefined} kind={kind} entries={library.entries} onBusy={setDialogBusy} onSaved={async()=>{setEditing(undefined);await load();}} onMessage={setMessage} onNavigate={next=>{setEditing(undefined);setKind(next);}}/></EditorDialog>}
+
+    {kind==='foods'&&<FoodCatalog entries={library.entries} onAdded={load} onCreate={()=>setEditing(null)}/>}
 
     <Collection key={kind} title={`Nutrition ${kind}`} loading={loading} error={loadError} onRetry={()=>void load()} actions={<button className="primary" onClick={()=>setEditing(null)}>Add {labels[kind]}</button>}>
 

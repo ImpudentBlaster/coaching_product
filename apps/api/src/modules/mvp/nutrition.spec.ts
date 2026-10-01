@@ -102,6 +102,84 @@ describe.skipIf(!process.env.DATABASE_URL)(
       await admin.end();
     });
 
+    it('searches owned clients and assigns multiple clients atomically with audit events', async () => {
+      const secondClient = randomUUID(), programId = randomUUID();
+      await pool.query("INSERT INTO users(id,email,password_hash,role,account_status) VALUES($1,$2,'unused','CLIENT','APPROVED')", [secondClient, `searchable-${secondClient}@example.test`]);
+      await pool.query("INSERT INTO client_profiles(user_id,display_name) VALUES($1,'Nisha Searchable')", [secondClient]);
+      await pool.query("INSERT INTO coach_clients(coach_id,client_id,status) VALUES($1,$2,'APPROVED')", [coach, secondClient]);
+      await pool.query("INSERT INTO programs(id,coach_id,name,status) VALUES($1,$2,'Bulk plan','PUBLISHED')", [programId, coach]);
+      const search = '/coach/programs/assignment-clients';
+      const byName = await request(app).get(search).query({ q: 'nisha' }).set('Authorization', coachToken);
+      expect(byName.status).toBe(200);
+      expect((byName.body as {items:Array<{id:string}>}).items.map(item => item.id)).toEqual([secondClient]);
+      const byEmail = await request(app).get(search).query({ q: `searchable-${secondClient}` }).set('Authorization', coachToken);
+      expect((byEmail.body as {items:Array<{id:string}>}).items.map(item => item.id)).toEqual([secondClient]);
+      expect((await request(app).get(search).query({ q: 'nisha' }).set('Authorization', token(otherCoach,'COACH'))).body).toEqual({ items: [], hasMore: false });
+      expect((await request(app).get(search).set('Authorization', token(client,'CLIENT'))).status).toBe(403);
+      const path = `/coach/programs/${programId}/assign`;
+      expect((await request(app).post(path).set('Authorization', coachToken).send({ clientIds: [] })).status).toBe(400);
+      expect((await request(app).post(path).set('Authorization', coachToken).send({ clientIds: [client, outsider] })).status).toBe(404);
+      expect((await pool.query('SELECT id FROM program_assignments WHERE program_id=$1',[programId])).rowCount).toBe(0);
+      await pool.query("ALTER TABLE audit_events ADD CONSTRAINT fail_bulk_assignment CHECK(action <> 'PROGRAM_ASSIGNED') NOT VALID");
+      try {
+        expect((await request(app).post(path).set('Authorization', coachToken).send({ clientIds: [client,secondClient] })).status).toBe(500);
+        expect((await pool.query('SELECT id FROM program_assignments WHERE program_id=$1',[programId])).rowCount).toBe(0);
+      } finally { await pool.query('ALTER TABLE audit_events DROP CONSTRAINT fail_bulk_assignment'); }
+      const result = await request(app).post(path).set('Authorization', coachToken).send({ clientIds: [client,secondClient,client] });
+      expect(result.status).toBe(201);
+      expect((result.body as { assignments: unknown[] }).assignments).toHaveLength(2);
+      const programCounts = await request(app).get('/coach/programs').set('Authorization', coachToken);
+      expect((programCounts.body as {programs:Array<{id:string;client_count:number}>}).programs.find(item => item.id === programId)?.client_count).toBe(2);
+      const checked = await request(app).get(search).query({ q: 'nisha', programId }).set('Authorization', coachToken);
+      expect((checked.body as {items:Array<{assignmentId:string}>}).items[0]!.assignmentId).toEqual(expect.any(String));
+      expect((await request(app).get(search).query({ q: 'nisha', programId }).set('Authorization', token(otherCoach,'COACH'))).status).toBe(404);
+      expect((await pool.query('SELECT id FROM program_assignments WHERE program_id=$1 AND active',[programId])).rowCount).toBe(2);
+      expect((await pool.query("SELECT id FROM audit_events WHERE action='PROGRAM_ASSIGNED' AND metadata->>'programId'=$1",[programId])).rowCount).toBe(2);
+      const assignedPath = `/coach/programs/${programId}/assignments`;
+      const listed = await request(app).get(assignedPath).set('Authorization', coachToken);
+      expect((listed.body as {items:unknown[]}).items).toHaveLength(2);
+      expect((await request(app).get(assignedPath).set('Authorization', token(otherCoach,'COACH'))).status).toBe(404);
+      const assignmentId = (result.body as {assignments:Array<{id:string}>}).assignments[0]!.id;
+      expect((await request(app).delete(`${assignedPath}/${assignmentId}`).set('Authorization', token(otherCoach,'COACH'))).status).toBe(404);
+      await pool.query("ALTER TABLE audit_events ADD CONSTRAINT fail_unassignment CHECK(action <> 'PROGRAM_UNASSIGNED') NOT VALID");
+      try {
+        expect((await request(app).delete(`${assignedPath}/${assignmentId}`).set('Authorization', coachToken)).status).toBe(500);
+        expect((await pool.query('SELECT id FROM program_assignments WHERE id=$1 AND active',[assignmentId])).rowCount).toBe(1);
+      } finally { await pool.query('ALTER TABLE audit_events DROP CONSTRAINT fail_unassignment'); }
+      expect((await request(app).delete(`${assignedPath}/${assignmentId}`).set('Authorization', coachToken)).status).toBe(204);
+      const updatedCounts = await request(app).get('/coach/programs').set('Authorization', coachToken);
+      expect((updatedCounts.body as {programs:Array<{id:string;client_count:number}>}).programs.find(item => item.id === programId)?.client_count).toBe(1);
+      const unchecked = await request(app).get(search).query({ q: '@', programId }).set('Authorization', coachToken);
+      expect((unchecked.body as {items:Array<{assignmentId:string|null}>}).items.filter(item => item.assignmentId === assignmentId)).toHaveLength(0);
+      expect((await pool.query('SELECT id FROM program_assignments WHERE program_id=$1 AND active',[programId])).rowCount).toBe(1);
+      expect((await pool.query("SELECT id FROM audit_events WHERE action='PROGRAM_UNASSIGNED' AND entity_id=$1",[assignmentId])).rowCount).toBe(1);
+      expect((await request(app).delete(`${assignedPath}/${assignmentId}`).set('Authorization', coachToken)).status).toBe(404);
+    });
+    it('edits published programs without changing assigned snapshots and audits atomically', async () => {
+      const programId = randomUUID(), first = randomUUID(), second = randomUUID(), foreign = randomUUID();
+      await pool.query("INSERT INTO workout_templates(id,coach_id,name) VALUES($1,$4,'Original'),($2,$4,'Updated'),($3,$5,'Other coach')", [first, second, foreign, coach, otherCoach]);
+      await pool.query("INSERT INTO programs(id,coach_id,name,status) VALUES($1,$2,'Published plan','PUBLISHED')", [programId, coach]);
+      await pool.query("INSERT INTO program_days(program_id,template_id,position,day_label) VALUES($1,$2,0,'Day 1')", [programId, first]);
+      const assigned = await request(app).post(`/coach/programs/${programId}/assign`).set('Authorization', coachToken).send({ clientId: client });
+      expect(assigned.status).toBe(201);
+      const snapshot = (await pool.query<{ snapshot: unknown }>('SELECT snapshot FROM program_assignments WHERE program_id=$1', [programId])).rows[0]!.snapshot;
+      const body = { name: 'Revised plan', description: 'New version', days: [{ templateId: second, dayLabel: 'Day 2' }] };
+      expect((await request(app).put(`/coach/programs/${programId}`).set('Authorization', token(otherCoach, 'COACH')).send(body)).status).toBe(409);
+      expect((await request(app).put(`/coach/programs/${programId}`).set('Authorization', token(client, 'CLIENT')).send(body)).status).toBe(403);
+      expect((await request(app).put(`/coach/programs/${programId}`).set('Authorization', coachToken).send({ ...body, days: [{ templateId: foreign, dayLabel: 'Day 2' }] })).status).toBe(409);
+      await pool.query("ALTER TABLE audit_events ADD CONSTRAINT fail_program_update CHECK(action <> 'PROGRAM_UPDATED') NOT VALID");
+      try {
+        expect((await request(app).put(`/coach/programs/${programId}`).set('Authorization', coachToken).send(body)).status).toBe(409);
+        expect((await pool.query<{ name: string }>('SELECT name FROM programs WHERE id=$1', [programId])).rows[0]!.name).toBe('Published plan');
+        expect((await pool.query<{ template_id: string }>('SELECT template_id FROM program_days WHERE program_id=$1', [programId])).rows[0]!.template_id).toBe(first);
+      } finally { await pool.query('ALTER TABLE audit_events DROP CONSTRAINT fail_program_update'); }
+      expect((await request(app).put(`/coach/programs/${programId}`).set('Authorization', coachToken).send(body)).status).toBe(200);
+      expect((await pool.query('SELECT name,status FROM programs WHERE id=$1', [programId])).rows[0]).toEqual({ name: 'Revised plan', status: 'PUBLISHED' });
+      expect((await pool.query<{ snapshot: unknown }>('SELECT snapshot FROM program_assignments WHERE program_id=$1', [programId])).rows[0]!.snapshot).toEqual(snapshot);
+      expect((await pool.query("SELECT id FROM audit_events WHERE entity_id=$1 AND action='PROGRAM_UPDATED'", [programId])).rowCount).toBe(1);
+      await pool.query("UPDATE programs SET status='ARCHIVED' WHERE id=$1", [programId]);
+      expect((await request(app).put(`/coach/programs/${programId}`).set('Authorization', coachToken).send(body)).status).toBe(409);
+    });
     it('archives programs only for their owner and rolls back when auditing fails',async()=>{
       const programId=randomUUID();
       await pool.query("INSERT INTO programs(id,coach_id,name,description) VALUES($1,$2,'Test program','')",[programId,coach]);

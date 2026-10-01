@@ -1,3 +1,4 @@
+import { foodCatalog, foodCopyId } from './food-catalog.js';
 import { Router, type Request, type Response } from 'express';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
@@ -42,6 +43,26 @@ export function createNutritionCoachRouter(pool: Pool): Router {
     const result = await pool.query<Entry>('SELECT id,data,version,created_at "createdAt" FROM nutrition_library WHERE coach_id=$1 AND archived_at IS NULL ORDER BY updated_at DESC,id', [request.auth!.userId]);
     const assignments = await pool.query<{ id: string; clientId: string; planId: string; assignedAt: string }>('SELECT id,client_id "clientId",plan_id "planId",assigned_at "assignedAt" FROM nutrition_plan_assignments WHERE coach_id=$1 AND active=true', [request.auth!.userId]);
     response.json({ entries: result.rows, assignments: assignments.rows });
+  });
+  router.get('/catalog', (request,response) => response.json({foods:foodCatalog.map(food=>({...food,libraryEntryId:foodCopyId(request.auth!.userId,food.id)}))}));
+  router.post('/catalog/:id/add', async (request,response) => {
+    const food=foodCatalog.find(item=>item.id===request.params.id);
+    if(!food)return response.status(404).json({message:'Starter food not found'});
+    const coachId=request.auth!.userId;const id=foodCopyId(coachId,food.id);
+    const result=await transaction(pool,async client=>{
+      const added=await client.query<Entry>(`INSERT INTO nutrition_library(id,coach_id,kind,data) VALUES($1,$2,'foods',$3)
+        ON CONFLICT(id) DO UPDATE SET data=excluded.data,archived_at=NULL,version=nutrition_library.version+1,updated_at=now()
+        WHERE nutrition_library.coach_id=$2 AND nutrition_library.archived_at IS NOT NULL
+        RETURNING id,data,version,created_at "createdAt"`,[id,coachId,JSON.stringify(food.data)]);
+      if(added.rows[0]){
+        await audit(client,coachId,'NUTRITION_CATALOG_ADDED',id,{catalogId:food.id,fdcId:food.source.fdcId});
+        return {entry:added.rows[0],added:true};
+      }
+      const existing=await client.query<Entry>('SELECT id,data,version,created_at "createdAt" FROM nutrition_library WHERE id=$1 AND coach_id=$2 AND archived_at IS NULL',[id,coachId]);
+      if(!existing.rows[0])throw new Error('Food copy unavailable');
+      return {entry:existing.rows[0],added:false};
+    });
+    return response.status(result.added?201:200).json(result);
   });
   async function saveEntry(request:Request,response:Response) {
     const kind = kinds.safeParse(request.params.kind);

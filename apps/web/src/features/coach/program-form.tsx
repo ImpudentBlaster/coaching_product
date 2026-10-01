@@ -53,6 +53,7 @@ export function ProgramForm({ templates, onSaved, onMessage, initial, onBusy }: 
 
   return <form className="card profile-card vertical" onSubmit={save}><Notice message={error} error onClear={()=>setError('')}/>
     <h2>{initial?'Edit program':'Create program'}</h2>
+    {initial?.status === 'PUBLISHED' && <p>Changes apply to future assignments. Existing clients keep their assigned version.</p>}
     <label>Name<input name="name" defaultValue={initial?.name} minLength={2} maxLength={150} required disabled={saving}/></label>
     <label>Description<textarea name="description" defaultValue={initial?.description} maxLength={2000} disabled={saving}/></label>
     {!availableTemplates.length && <p>Create a workout template before adding workouts to a program.</p>}
