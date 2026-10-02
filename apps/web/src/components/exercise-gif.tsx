@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiBlob } from '../lib/api';
-import { LoadingImage } from './loading-image';
+import { ImagePlaceholder, LoadingImage } from './loading-image';
 
 export function ExerciseGif({ id, name, available = true }: { id: string; name: string; available?: boolean }) {
   return <ExerciseAnimation key={`${id}-${available}`} id={id} name={name} available={available} />;
@@ -8,7 +8,6 @@ export function ExerciseGif({ id, name, available = true }: { id: string; name: 
 function ExerciseAnimation({ id, name, available }: { id: string; name: string; available: boolean }) {
   const [url, setUrl] = useState('');
   const [failed, setFailed] = useState(false);
-  const [retry, setRetry] = useState(0);
   useEffect(() => {
     let active = true, objectUrl = '';
     setFailed(false); setUrl('');
@@ -16,8 +15,8 @@ function ExerciseAnimation({ id, name, available }: { id: string; name: string; 
       if (active) { objectUrl = URL.createObjectURL(blob); setUrl(objectUrl); }
     }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [id, available, retry]);
+  }, [id, available]);
   return <div className="exercise-media">{failed
-    ? <div><span>{available ? 'Animation could not load' : 'No animation available'}</span><button className="secondary small" type="button" onClick={() => setRetry(value => value + 1)} aria-label={`Retry animation for ${name}`}>Retry animation</button></div>
+    ? <div className="loading-image"><ImagePlaceholder loading={false} label={`${name} demonstration unavailable`} /></div>
     : <LoadingImage src={url} alt={`${name} demonstration`} onError={() => setFailed(true)} />}</div>;
 }

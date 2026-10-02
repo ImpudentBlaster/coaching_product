@@ -1,3 +1,4 @@
+import { foodCatalog, foodCopyId } from './food-catalog.js';
 import { Router, type Request, type Response } from 'express';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
@@ -7,15 +8,18 @@ export const nutrientsSchema = z.object({ calories: number, protein: number, car
 type Nutrients = z.infer<typeof nutrientsSchema>;
 const base = { name: z.string().trim().min(2).max(150), notes: z.string().trim().max(2000).default('') };
 const ref = z.object({ id: z.string().uuid(), label: z.string().trim().min(1).max(100) });
+const foodRef = z.object({ id: z.string().uuid(), quantity: z.number().finite().min(0.01).max(10000) });
+const dayItem = z.union([ref.extend({type:z.literal('meals').optional()}),ref.extend({type:z.literal('foods'),quantity:z.number().finite().min(0.01).max(10000)}),ref.extend({type:z.literal('custom'),foods:z.array(foodRef).min(1).max(30)})]);
+const planItem = z.union([ref.extend({type:z.literal('days').optional()}),ref.extend({type:z.literal('custom'),notes:base.notes,items:z.array(dayItem).min(1).max(12)})]);
 export const nutritionInput = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('foods'), ...base, servingSize: z.number().finite().min(0.01).max(10000), unit: z.enum(['g', 'ml', 'piece']), nutrients: nutrientsSchema }),
   z.object({ kind: z.literal('meals'), ...base, items: z.array(z.object({ id: z.string().uuid(), quantity: z.number().finite().min(0.01).max(10000) })).min(1).max(30) }),
-  z.object({ kind: z.literal('days'), ...base, items: z.array(ref).min(1).max(12) }),
-  z.object({ kind: z.literal('plans'), ...base, items: z.array(ref).min(1).max(31) }),
+  z.object({ kind: z.literal('days'), ...base, items: z.array(dayItem).min(1).max(12) }),
+  z.object({ kind: z.literal('plans'), ...base, items: z.array(planItem).min(1).max(31) }),
 ]);
 type Kind = z.infer<typeof nutritionInput>['kind'];
-export type NutritionNode = { name: string; notes: string; kind: Kind; nutrients?: Nutrients; servingSize?: number; unit?: string; items?: Array<{ id: string; label?: string; quantity?: number; node: NutritionNode; nutrients?: Nutrients }> };
-type Entry = { id: string; data: NutritionNode; createdAt: string; version:number };
+export type NutritionNode = { name: string; notes: string; kind: Kind; custom?: boolean; nutrients?: Nutrients; servingSize?: number; unit?: string; items?: Array<{ id: string; label?: string; quantity?: number; node: NutritionNode; nutrients?: Nutrients }> };
+type Entry = { id: string; data: NutritionNode; createdAt: string; updatedAt:string; version:number };
 class NutritionError extends Error {}
 const kinds = z.enum(['foods', 'meals', 'days', 'plans']);
 
@@ -39,9 +43,29 @@ async function audit(client: PoolClient, coach: string, action: string, id: stri
 export function createNutritionCoachRouter(pool: Pool): Router {
   const router = Router();
   router.get('/', async (request, response) => {
-    const result = await pool.query<Entry>('SELECT id,data,version,created_at "createdAt" FROM nutrition_library WHERE coach_id=$1 AND archived_at IS NULL ORDER BY updated_at DESC,id', [request.auth!.userId]);
+    const result = await pool.query<Entry>('SELECT id,data,version,created_at "createdAt",updated_at "updatedAt" FROM nutrition_library WHERE coach_id=$1 AND archived_at IS NULL ORDER BY updated_at DESC,id', [request.auth!.userId]);
     const assignments = await pool.query<{ id: string; clientId: string; planId: string; assignedAt: string }>('SELECT id,client_id "clientId",plan_id "planId",assigned_at "assignedAt" FROM nutrition_plan_assignments WHERE coach_id=$1 AND active=true', [request.auth!.userId]);
     response.json({ entries: result.rows, assignments: assignments.rows });
+  });
+  router.get('/catalog', (request,response) => response.json({foods:foodCatalog.map(food=>({...food,libraryEntryId:foodCopyId(request.auth!.userId,food.id)}))}));
+  router.post('/catalog/:id/add', async (request,response) => {
+    const food=foodCatalog.find(item=>item.id===request.params.id);
+    if(!food)return response.status(404).json({message:'Starter food not found'});
+    const coachId=request.auth!.userId;const id=foodCopyId(coachId,food.id);
+    const result=await transaction(pool,async client=>{
+      const added=await client.query<Entry>(`INSERT INTO nutrition_library(id,coach_id,kind,data) VALUES($1,$2,'foods',$3)
+        ON CONFLICT(id) DO UPDATE SET data=excluded.data,archived_at=NULL,version=nutrition_library.version+1,updated_at=now()
+        WHERE nutrition_library.coach_id=$2 AND nutrition_library.archived_at IS NOT NULL
+        RETURNING id,data,version,created_at "createdAt",updated_at "updatedAt"`,[id,coachId,JSON.stringify(food.data)]);
+      if(added.rows[0]){
+        await audit(client,coachId,'NUTRITION_CATALOG_ADDED',id,{catalogId:food.id,fdcId:food.source.fdcId});
+        return {entry:added.rows[0],added:true};
+      }
+      const existing=await client.query<Entry>('SELECT id,data,version,created_at "createdAt",updated_at "updatedAt" FROM nutrition_library WHERE id=$1 AND coach_id=$2 AND archived_at IS NULL',[id,coachId]);
+      if(!existing.rows[0])throw new Error('Food copy unavailable');
+      return {entry:existing.rows[0],added:false};
+    });
+    return response.status(result.added?201:200).json(result);
   });
   async function saveEntry(request:Request,response:Response) {
     const kind = kinds.safeParse(request.params.kind);
@@ -57,19 +81,42 @@ export function createNutritionCoachRouter(pool: Pool): Router {
         const node: NutritionNode = { kind: input.kind, name: input.name, notes: input.notes };
         if (input.kind === 'foods') Object.assign(node, { servingSize: input.servingSize, unit: input.unit, nutrients: input.nutrients });
         else {
-          const childKind = input.kind === 'meals' ? 'foods' : input.kind === 'days' ? 'meals' : 'days';
-          const children = await client.query<Entry>('SELECT id,data FROM nutrition_library WHERE coach_id=$1 AND kind=$2 AND archived_at IS NULL AND id=ANY($3::uuid[])', [request.auth!.userId, childKind, input.items.map(item => item.id)]);
-          node.items = input.items.map(item => {
-            const child = children.rows.find(row => row.id === item.id)?.data;
-            if (!child) throw new NutritionError('A selected entry is unavailable. Choose entries from your own library.');
-            if ('quantity' in item) return { id: item.id, quantity: item.quantity, node: child, nutrients: portion(child.nutrients!, item.quantity, child.servingSize!) };
-            return { id: item.id, label: item.label, node: child, ...(child.nutrients ? { nutrients: child.nutrients } : {}) };
+          const dayIds=(item:z.infer<typeof dayItem>)=>'foods' in item?item.foods.map(food=>food.id):[item.id];
+          const ids=input.items.flatMap(item=>'items' in item?item.items.flatMap(dayIds):'foods' in item?item.foods.map(food=>food.id):[item.id]);
+          const children=await client.query<Entry>('SELECT id,data FROM nutrition_library WHERE coach_id=$1 AND kind=ANY($2::text[]) AND archived_at IS NULL AND id=ANY($3::uuid[])',[request.auth!.userId,input.kind==='plans'?['days','meals','foods']:input.kind==='days'?['meals','foods']:['foods'],ids]);
+          function childNode(id:string,kind:Kind):NutritionNode {
+            const child=children.rows.find(row=>row.id===id)?.data;
+            if(!child||child.kind!==kind)throw new NutritionError('A selected entry is unavailable. Choose matching entries from your own library.');
+            return child;
+          }
+          function foodPortion(food:z.infer<typeof foodRef>) {
+            const child=childNode(food.id,'foods');
+            return {id:food.id,quantity:food.quantity,node:child,nutrients:portion(child.nutrients!,food.quantity,child.servingSize!)};
+          }
+          function dayEntry(item:z.infer<typeof dayItem>):NonNullable<NutritionNode['items']>[number] {
+            if('foods' in item) {
+              const foods=item.foods.map(foodPortion);const nutrients=sumNutrients(foods.map(food=>food.nutrients));
+              return {id:item.id,label:item.label,node:{kind:'meals',custom:true,name:item.label,notes:'',items:foods,nutrients},nutrients};
+            }
+            if('quantity' in item)return {...foodPortion(item),label:item.label};
+            const child=childNode(item.id,'meals');
+            return {id:item.id,label:item.label,node:child,nutrients:child.nutrients!};
+          }
+          if(input.kind==='meals')node.items=input.items.map(foodPortion);
+          else if(input.kind==='days')node.items=input.items.map(dayEntry);
+          else node.items=input.items.map(item=>{
+            if('items' in item) {
+              const meals=item.items.map(dayEntry);const nutrients=sumNutrients(meals.map(meal=>meal.nutrients!));
+              return {id:item.id,label:item.label,node:{kind:'days' as const,custom:true,name:item.label,notes:item.notes,items:meals,nutrients},nutrients};
+            }
+            const child=childNode(item.id,'days');
+            return {id:item.id,label:item.label,node:child,...(child.nutrients?{nutrients:child.nutrients}:{})};
           });
           if (input.kind !== 'plans') node.nutrients = sumNutrients(node.items.map(item => item.nutrients!));
         }
         const serialized = JSON.stringify(node);
         if (Buffer.byteLength(serialized) > 512000) throw new NutritionError('This plan is too large. Use fewer days or meals.');
-        const result = id ? await client.query<Entry>('UPDATE nutrition_library SET data=$1,version=version+1,updated_at=now() WHERE id=$2 AND coach_id=$3 AND kind=$4 AND version=$5 AND archived_at IS NULL RETURNING id,data,version,created_at "createdAt"',[serialized,id,request.auth!.userId,input.kind,version.success?version.data.version:0]) : await client.query<Entry>('INSERT INTO nutrition_library(coach_id,kind,data) VALUES($1,$2,$3) RETURNING id,data,version,created_at "createdAt"', [request.auth!.userId, input.kind, serialized]);
+        const result = id ? await client.query<Entry>('UPDATE nutrition_library SET data=$1,version=version+1,updated_at=now() WHERE id=$2 AND coach_id=$3 AND kind=$4 AND version=$5 AND archived_at IS NULL RETURNING id,data,version,created_at "createdAt",updated_at "updatedAt"',[serialized,id,request.auth!.userId,input.kind,version.success?version.data.version:0]) : await client.query<Entry>('INSERT INTO nutrition_library(coach_id,kind,data) VALUES($1,$2,$3) RETURNING id,data,version,created_at "createdAt",updated_at "updatedAt"', [request.auth!.userId, input.kind, serialized]);
         if(!result.rows[0])throw new NutritionError('Entry changed or is unavailable. Reload the list and try again.');
         const saved = result.rows[0];
         await audit(client, request.auth!.userId, id?'NUTRITION_UPDATED':'NUTRITION_CREATED', saved.id, { kind: input.kind });

@@ -1,0 +1,11 @@
+.collection-table .food-name { width: 30%; min-width: 180px; }
+.collection-table .food-name > strong { display: block; color: var(--forme-ink); font-weight: var(--weight-label); }
+.collection-table .food-name > small { display: block; margin-top: var(--space-1); color: var(--color-muted); }
+.collection-table .food-name .food-source { display: inline-block; margin-top: var(--space-1); font-size: var(--font-helper); }
+.collection-table .food-name details { font-size: var(--font-helper); margin-top: var(--space-2); }
+.collection-table .food-name summary { min-height: 0; padding-block: var(--space-1); display: list-item; width: fit-content; color: var(--color-primary); }
+.food-macronutrients { display: flex; gap: var(--space-4); font-variant-numeric: tabular-nums; }
+.food-macronutrients > span { display: grid; gap: var(--space-1); white-space: nowrap; }
+.food-macronutrients small { color: var(--color-muted); font-size: var(--font-helper); }
+.collection-table .food-weight, .collection-table .food-calories { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.collection-table .food-actions .actions { flex-wrap: nowrap; justify-content: flex-start; gap: var(--space-2); }

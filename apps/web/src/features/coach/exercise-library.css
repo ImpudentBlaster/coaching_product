@@ -1,2 +1,90 @@
-.exercise-library-hint{color:#74847b;font-size:.82rem;line-height:1.65;margin:8px 0 0}.exercise-search-area{padding:0 24px 22px;border-bottom:1px solid #e1e9e4}.exercise-search-area .collection-search{flex:1}.exercise-search-area .collection-tools{width:100%}.exercise-suggestion-heading{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:18px 0 10px;font-size:.75rem;color:#73867a}.exercise-suggestion-heading button{color:#087957;font-weight:700}.exercise-suggestions{display:flex;flex-wrap:wrap;gap:8px}.exercise-suggestions>button{text-align:left;background:#f0f7f3;border:1px solid #dbe9df;padding:10px 14px;border-radius:12px;font-size:.8rem;color:#244f3b;max-width:100%;overflow-wrap:anywhere}.exercise-suggestions small{display:block;color:#788b7e;font-size:.66rem;margin-top:4px}.exercise-form fieldset{border:0;padding:0;margin:0;min-width:0}.exercise-form h3{font-size:1rem;margin:12px 0 0}.exercise-instruction{display:flex;gap:12px;align-items:end}.exercise-instruction label{flex:1}.exercise-instruction button{margin-bottom:4px;padding:10px;font-size:.75rem}.exercise-upload-preview{display:grid;justify-items:start;gap:10px}.exercise-upload-preview img{max-width:100%;height:200px;object-fit:contain;border:1px solid #e1e9e4;border-radius:12px}.exercise-media>div{display:grid;justify-items:center;gap:12px;padding:14px;text-align:center}.exercise-media button{font-size:.72rem;padding:7px 10px}.exercise-library button:focus-visible{outline:2px solid #087957;outline-offset:3px}.exercise-library .notice{margin:16px 24px}.exercise-picker{display:grid;gap:8px}.exercise-picker p{margin:0;font-size:.75rem;color:#74847b}
-@media(max-width:600px){.exercise-search-area{padding:0 16px 18px}.exercise-library>.collection-toolbar{flex-wrap:wrap;gap:15px}.exercise-suggestions>button{flex:1 1 40%}.exercise-instruction{align-items:start}.exercise-instruction button{margin-top:24px}.exercise-form .form-row{grid-template-columns:1fr}}
+.exercise-library-hint{color:#74847b;font-size:.82rem;line-height:1.65;margin: var(--space-2) 0 0}.exercise-search-area{padding: 0 var(--space-6) 22px;border-bottom:1px solid #e1e9e4}.exercise-search-area .collection-search{flex:1}.exercise-search-area .collection-tools{width:100%}.exercise-form fieldset{border:0;padding: 0;margin: 0;min-width:0}.exercise-form h3{font-size:1rem;margin: var(--space-3) 0 0}.exercise-instruction{display:flex;gap: var(--space-3);align-items:end}.exercise-instruction label{flex:1}.exercise-instruction button{margin-bottom: var(--space-1);padding: 7px;font-size:.75rem}.exercise-upload-preview{display:grid;justify-items:start;gap: 10px}.exercise-upload-preview img{max-width:100%;height:200px;object-fit:contain;border:1px solid #e1e9e4;border-radius: var(--radius-card)}.exercise-media>div{display:grid;justify-items:center;gap: var(--space-3);padding: 14px;text-align:center}.exercise-media button{font-size:.72rem;padding: 4.9px 7px}.exercise-library button:focus-visible{outline:2px solid #087957;outline-offset:3px}.exercise-library .notice{margin: var(--space-4) var(--space-6)}.exercise-picker{display:grid;gap: var(--space-2)}.exercise-picker p{margin: 0;font-size:.75rem;color:#74847b}
+@media(max-width:600px){.exercise-search-area{padding: 0 var(--space-4) 18px}.exercise-library>.collection-toolbar{flex-wrap:wrap;gap: 15px}.exercise-instruction{align-items:start}.exercise-instruction button{margin-top: var(--space-6)}.exercise-form .form-row{grid-template-columns:1fr}}
+.exercise-library > .collection-toolbar {
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-bottom: 0;
+}
+.exercise-library .exercise-library-hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-body);
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+.exercise-library .exercise-search-area {
+  padding: 0 var(--space-5) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+.exercise-library .collection-search { min-width: 0; }
+.exercise-library .exercise-table-scroll { width: 100%; overflow-x: auto; }
+.exercise-library .exercise-table {
+  width: 100%; min-width: 960px; table-layout: fixed;
+  border-collapse: collapse; text-align: left; font-size: var(--font-body);
+}
+/* Include cell padding in the preview column; the name receives remaining
+   width while short metadata and the instructions action stay bounded. */
+.exercise-col-preview { width: 136px; }
+.exercise-col-name { width: auto; }
+.exercise-col-body { width: clamp(120px, 12%, 156px); }
+.exercise-col-equipment { width: clamp(140px, 14%, 176px); }
+.exercise-col-target { width: clamp(220px, 22%, 280px); }
+.exercise-col-instructions { width: 150px; }
+.exercise-library .exercise-table :is(th, td) {
+  padding: var(--space-4) var(--space-5); vertical-align: middle;
+  border-bottom: 1px solid var(--color-border);
+  line-height: 1.5; overflow-wrap: anywhere;
+}
+.exercise-library .exercise-table thead th {
+  padding-block: var(--space-4);
+  background: var(--color-surface-subtle); color: var(--color-muted);
+  font-size: var(--font-helper); font-weight: var(--weight-heading);
+  white-space: nowrap;
+}
+.exercise-library .exercise-table th[scope=row] {
+  color: var(--forme-ink); font-size: 1rem; font-weight: var(--weight-label);
+}
+.exercise-library .exercise-table td:nth-child(3),
+.exercise-library .exercise-table td:nth-child(4) { color: var(--color-muted); }
+.exercise-library .exercise-table td small {
+  display: block; margin-top: var(--space-1); font-size: var(--font-helper);
+  color: var(--color-muted); line-height: 1.4;
+}
+.exercise-library .exercise-table .status {
+  display: block; width: fit-content; margin-top: var(--space-2);
+}
+.exercise-library .exercise-table tbody tr:last-child :is(th, td) { border-bottom: 0; }
+.exercise-library .exercise-table tbody tr:has(details[open]) :is(th, td):not(:first-child) { vertical-align: top; }
+/* Rows have no click handler: keep the default cursor, and highlight the row
+   only while its actual instructions control is hovered or focused. */
+.exercise-library .exercise-table tbody tr:has(summary:hover),
+.exercise-library .exercise-table tbody tr:focus-within { background: var(--color-surface-subtle); }
+.exercise-library .exercise-table summary {
+  cursor: pointer; color: var(--color-primary); font-size: var(--font-body);
+  padding-block: var(--space-1); width: fit-content;
+}
+.exercise-library .exercise-table summary::marker { font-size: .75em; }
+.exercise-library .exercise-table summary:hover { text-decoration: underline; text-underline-offset: 3px; }
+.exercise-library .exercise-table ol {
+  padding-left: var(--space-5); margin: var(--space-2) 0 0;
+  font-size: var(--font-helper); line-height: 1.6;
+}
+.exercise-library .exercise-table li + li { margin-top: var(--space-2); }
+.exercise-library .exercise-table .exercise-media {
+  box-sizing: border-box; width: 96px; height: 96px; min-height: 0;
+  padding: var(--space-1); overflow: hidden;
+  border: 1px solid var(--color-border); border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+.exercise-library .exercise-table .exercise-media > .loading-image {
+  width: 100%; height: 100%; min-height: 0; padding: 0; aspect-ratio: 1;
+  border-radius: 0;
+}
+.exercise-library .exercise-table .exercise-media img {
+  display: block; width: 100%; height: 100%; object-fit: contain;
+}
+@media (max-width: 600px) {
+  .exercise-library > .collection-toolbar { padding: var(--space-4); }
+  .exercise-library .exercise-search-area { padding: 0 var(--space-4) var(--space-4); }
+  .exercise-library .exercise-table :is(th, td) { padding-inline: var(--space-3); }
+}

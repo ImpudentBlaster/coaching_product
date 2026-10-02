@@ -1,28 +1,107 @@
+import { GlobalNotifications } from '../../components/global-notifications';
+import { notify } from '../../lib/notify';
 import { MemoryRouter } from 'react-router-dom';
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { apiRequest } from '../../lib/api';
+import type { ClientRelationship } from '../../lib/api';
 import { NutritionStudio } from './nutrition-studio';
 import { AssignedNutritionPlan, type NutritionEntry } from '../nutrition/nutrition-details';
 
 vi.mock('../../lib/api', () => ({ apiRequest: vi.fn() }));
 HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
 HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
-afterEach(() => { cleanup(); vi.resetAllMocks(); });
+afterEach(() => { notify.dismiss(); cleanup(); vi.resetAllMocks(); });
 const food: NutritionEntry = { id: 'oats', createdAt: '2026-09-07', data: { kind: 'foods', name: 'Oats', notes: '', servingSize: 100, unit: 'g', nutrients: { calories: 400, protein: 10, carbs: 70, fat: 8 } } };
+it('shows manual foods and added catalog copies in the same searchable table with edit and delete',async()=>{
+  const copied: NutritionEntry={...food,id:'catalog-copy',data:{...food.data,name:'Rice',servingSize:50,nutrients:{calories:65,protein:1.5,carbs:14,fat:.2}}};
+  let deleted=false;
+  vi.mocked(apiRequest).mockImplementation(async(path,options)=>{
+    if(options?.method==='DELETE'){deleted=true;return {};}
+    if(path.endsWith('/catalog'))return {foods:[{id:'usda-rice',libraryEntryId:copied.id,data:copied.data,category:'Grains',source:{url:'https://example.com'}}]};
+    return {entries:deleted?[food]:[copied,food],assignments:[]};
+  });
+  const confirmation=vi.spyOn(window,'confirm');
+  render(<MemoryRouter initialEntries={['/coach/studio?tab=nutrition&section=foods']}><NutritionStudio clients={[]}/></MemoryRouter>);
+  const table=await screen.findByRole('table',{name:'Nutrition foods'});
+  expect(screen.getAllByRole('table')).toHaveLength(1);
+  expect(screen.queryByText('Common foods, ready to use')).not.toBeInTheDocument();
+  expect(screen.getByRole('button',{name:'Add From Library'})).toBeInTheDocument();
+  expect(within(table).getAllByRole('columnheader').map(cell=>cell.textContent)).toEqual(['Name','Weight','Macronutrients','Calories','Action']);
+  expect(within(table).getByText('100 g')).toBeInTheDocument();
+  expect(within(table).getByText('50 g')).toBeInTheDocument();
+  const row=within(table).getByText('Rice').closest('tr')!;
+  expect(within(row).getByRole('cell',{name:'65 kcal'})).toBeInTheDocument();
+  expect(within(row).getByText('14 g')).toBeInTheDocument();
+  expect(within(table).getAllByRole('row')[1]).toHaveTextContent('Oats');
+  expect(within(row).getAllByRole('cell')[0]).toHaveTextContent(/^Rice$/);
+  fireEvent.click(within(row).getByRole('button',{name:'Actions for Rice'}));
+  fireEvent.click(screen.getByRole('menuitem',{name:'Edit'}));
+  expect(screen.getByLabelText('Name')).toHaveValue('Rice');
+  fireEvent.click(screen.getByRole('button',{name:'Close form'}));
+  fireEvent.click(within(row).getByRole('button',{name:'Actions for Rice'}));
+  fireEvent.click(screen.getByRole('menuitem',{name:'Delete'}));
+  expect(deleted).toBe(false);
+  expect(screen.getByRole('dialog',{name:'Delete food?'})).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Cancel'}));
+  expect(screen.queryByRole('dialog',{name:'Delete food?'})).not.toBeInTheDocument();
+  fireEvent.click(within(row).getByRole('button',{name:'Actions for Rice'}));
+  fireEvent.click(screen.getByRole('menuitem',{name:'Delete'}));
+  fireEvent.click(screen.getByRole('button',{name:'Delete food'}));
+  expect(confirmation).not.toHaveBeenCalled();
+  await waitFor(()=>expect(apiRequest).toHaveBeenCalledWith('/coach/nutrition-library/foods/catalog-copy',{method:'DELETE'}));
+  await waitFor(()=>expect(within(table).queryByText('Rice')).not.toBeInTheDocument());
+  confirmation.mockRestore();
+});
+
+it('closes the predefined food library after searching without a discard prompt',async()=>{
+  vi.mocked(apiRequest).mockImplementation(async path=>path.endsWith('/catalog')?{foods:[]}:{entries:[food],assignments:[]});
+  render(<MemoryRouter initialEntries={['/coach/studio?tab=nutrition&section=foods']}><NutritionStudio clients={[]}/></MemoryRouter>);
+  fireEvent.click(await screen.findByRole('button',{name:'Add From Library'}));
+  const dialog=screen.getByRole('dialog',{name:'Add From Library'});
+  expect(within(dialog).getByText('Choose from the predefined food library to add foods to your collection.')).toBeInTheDocument();
+  fireEvent.change(within(dialog).getByRole('searchbox'),{target:{value:'rice'}});
+  fireEvent.change(within(dialog).getByLabelText('Category'),{target:{value:''}});
+  fireEvent.click(within(dialog).getByRole('button',{name:'Close form'}));
+  expect(screen.queryByRole('dialog',{name:'Add From Library'})).not.toBeInTheDocument();
+  expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+});
+
+it('shows meals in a searchable table and opens their foods in a detail drawer',async()=>{
+  const meal:NutritionEntry={id:'breakfast',createdAt:food.createdAt,updatedAt:'2026-10-03T12:00:00Z',data:{kind:'meals',name:'Breakfast',notes:'Before training',nutrients:food.data.nutrients!,items:[{id:food.id,quantity:50,node:{...food.data,notes:'USDA FDC source https://fdc.nal.usda.gov/'},nutrients:{calories:200,protein:5,carbs:35,fat:4}}]}};
+  vi.mocked(apiRequest).mockImplementation(async path=>path.endsWith('/catalog')?{foods:[]}:{entries:[food,meal],assignments:[]});
+  render(<MemoryRouter initialEntries={['/coach/studio?tab=nutrition&section=meals']}><NutritionStudio clients={[]}/></MemoryRouter>);
+  const table=await screen.findByRole('table',{name:'Nutrition meals'});
+  expect(within(table).getAllByRole('columnheader').map(cell=>cell.textContent)).toEqual(['Name','Foods','Macronutrients','Calories','Created at','Updated at','Action','View']);
+  expect(within(table).getByText(new Date(food.createdAt).toLocaleString())).toBeInTheDocument();
+  expect(within(table).getByText(new Date('2026-10-03T12:00:00Z').toLocaleString())).toBeInTheDocument();
+  fireEvent.click(within(table).getByRole('button',{name:'View Breakfast'}));
+  const dialog=screen.getByRole('dialog',{name:'Meal details'});
+  expect(dialog).toHaveClass('editor-dialog-drawer');
+  expect(within(dialog).getByText('Oats')).toBeInTheDocument();
+  expect(within(dialog).getByText('50 g')).toBeInTheDocument();
+  expect(within(dialog).getByText('Before training')).toBeInTheDocument();
+  expect(within(dialog).queryByText(/USDA FDC source/)).not.toBeInTheDocument();
+  expect(within(dialog).getByRole('list')).toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole('button',{name:'Edit meal'}));
+  expect(screen.queryByRole('dialog',{name:'Meal details'})).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Name')).toHaveValue('Breakfast');
+});
 
 it('creates a meal with multiple food quantities and correct live totals', async () => {
-  vi.mocked(apiRequest).mockResolvedValue({ entries: [food], assignments: [] });
+  vi.mocked(apiRequest).mockImplementation(async path => path.endsWith('/catalog') ? { foods: [] } : { entries: [food], assignments: [] });
   render(<MemoryRouter initialEntries={['/coach/studio?tab=nutrition']}><NutritionStudio clients={[]}/></MemoryRouter>);
   await screen.findByRole('button', { name: 'Add plan' });
   fireEvent.click(screen.getByRole('link', { name: 'Meals' }));
  fireEvent.click(screen.getByRole('button', { name: 'Add meal' }));
   fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Breakfast' } });
-  fireEvent.change(screen.getByLabelText('food'), { target: { value: 'oats' } });
+  fireEvent.focus(screen.getByRole('combobox',{name:'Food 1'}));
+  fireEvent.click(screen.getByRole('option',{name:'Oats'}));
   fireEvent.change(screen.getByLabelText('Quantity (g)'), { target: { value: '50' } });
   fireEvent.click(screen.getByRole('button', { name: 'Add food' }));
-  fireEvent.change(screen.getAllByLabelText('food')[1]!, { target: { value: 'oats' } });
+  fireEvent.focus(screen.getByRole('combobox',{name:'Food 2'}));
+  fireEvent.click(screen.getByRole('option',{name:'Oats'}));
   fireEvent.change(screen.getAllByLabelText('Quantity (g)')[1]!, { target: { value: '25' } });
   expect(screen.getByText('300 kcal')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Create meal' }));
@@ -31,16 +110,16 @@ it('creates a meal with multiple food quantities and correct live totals', async
 });
 
 it('guides an empty library through the required hierarchy', async () => {
-  vi.mocked(apiRequest).mockResolvedValue({ entries: [], assignments: [] });
+  vi.mocked(apiRequest).mockImplementation(async path => path.endsWith('/catalog') ? { foods: [] } : { entries: [], assignments: [] });
   render(<MemoryRouter initialEntries={['/coach/studio?tab=nutrition']}><NutritionStudio clients={[]}/></MemoryRouter>);
   fireEvent.click(await screen.findByRole('button', { name: 'Add plan' }));
   expect(screen.getByRole('button', { name: 'Create plan' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Go to days' }));
  fireEvent.click(screen.getByRole('button', { name: 'Add day' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Go to meals' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Go to meals' }));
  fireEvent.click(screen.getByRole('button', { name: 'Add meal' }));
   fireEvent.click(screen.getByRole('button', { name: 'Go to foods' }));
- fireEvent.click(screen.getByRole('button', { name: 'Add food' }));
+ fireEvent.click(screen.getByRole('button', { name: 'Create Food' }));
   expect(screen.getByRole('heading', { name: 'Create food' })).toBeInTheDocument();
 });
 
@@ -53,4 +132,182 @@ it('shows an assigned plan with days, meals, food quantities and daily totals', 
   expect(screen.getByText('Day 1 — Training day')).toBeInTheDocument();
   expect(screen.getByText('Morning — Breakfast')).toBeInTheDocument();
   expect(screen.getByText('Oats · 100 g')).toBeInTheDocument();
+});
+
+it('searches starter and manual foods in meals and saves the selected starter copy', async () => {
+  const starter = { id: 'usda-123', libraryEntryId: 'starter-copy', data: { ...food.data, name: 'Starter rice' } };
+  const copy = { id: starter.libraryEntryId, createdAt: '2026-10-02', data: starter.data };
+  vi.mocked(apiRequest).mockImplementation(async path=>path.endsWith('/catalog')?{foods:[starter]}:path.endsWith('/add')?{entry:copy}:{entries:[food],assignments:[]});
+  render(<MemoryRouter initialEntries={['/coach/studio?tab=nutrition&section=meals']}><NutritionStudio clients={[]}/></MemoryRouter>);
+  await waitFor(() => expect(apiRequest).toHaveBeenCalledWith('/coach/nutrition-library'));
+  fireEvent.click(screen.getByRole('button', { name: 'Add meal' }));
+  fireEvent.focus(screen.getByRole('combobox',{name:'Food 1'}));
+  expect(await screen.findByRole('option', { name: 'Starter rice' })).toBeInTheDocument();
+  fireEvent.change(screen.getByRole('combobox', { name: 'Food 1' }), { target: { value: 'oat' } });
+  expect(screen.getByRole('option', { name: 'Oats' })).toBeInTheDocument();
+  expect(screen.queryByRole('option', { name: 'Starter rice' })).not.toBeInTheDocument();
+  fireEvent.change(screen.getByRole('combobox', { name: 'Food 1' }), { target: { value: 'rice' } });
+  fireEvent.click(screen.getByRole('option',{name:'Starter rice'}));
+  await waitFor(() => expect(screen.getByRole('combobox',{name:'Food 1'})).toHaveValue('Starter rice'));
+  expect(apiRequest).toHaveBeenCalledWith('/coach/nutrition-library/catalog/usda-123/add',{method:'POST',body:'{}'});
+  fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Rice meal' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create meal' }));
+  await waitFor(() => expect(apiRequest).toHaveBeenCalledWith('/coach/nutrition-library/meals', expect.objectContaining({ body: JSON.stringify({ name: 'Rice meal', notes: '', items: [{ id: 'starter-copy', quantity: 100 }], version: 1 }) })));
+});
+
+it('creates named entries with a saved meal and multiple foods', async () => {
+  const meal:NutritionEntry={id:'breakfast',createdAt:food.createdAt,data:{kind:'meals',name:'Breakfast',notes:'',nutrients:{calories:300,protein:7.5,carbs:52.5,fat:6},items:[]}};
+  vi.mocked(apiRequest).mockImplementation(async path=>path.endsWith('/catalog')?{foods:[]}:{entries:[food,meal],assignments:[]});
+  render(<MemoryRouter initialEntries={['/coach/studio?tab=nutrition&section=days']}><NutritionStudio clients={[]}/></MemoryRouter>);
+  fireEvent.click(await screen.findByRole('button',{name:'Add day'}));
+  fireEvent.change(screen.getByLabelText('Name'),{target:{value:'Training day'}});
+  fireEvent.change(screen.getByLabelText('Entry name'),{target:{value:'Morning'}});
+  fireEvent.change(screen.getByLabelText('Entry type'),{target:{value:'meals'}});
+  fireEvent.change(screen.getByLabelText('Meal'),{target:{value:meal.id}});
+  fireEvent.click(screen.getByRole('button',{name:'Add entry'}));
+  fireEvent.change(screen.getAllByLabelText('Entry name')[1]!,{target:{value:'Lunch'}});
+  fireEvent.focus(screen.getByRole('combobox',{name:'Food 1'}));
+  fireEvent.click(screen.getByRole('option',{name:'Oats'}));
+  fireEvent.change(screen.getByLabelText('Quantity (g)'),{target:{value:'50'}});
+  fireEvent.click(screen.getByRole('button',{name:'Add food'}));
+  fireEvent.focus(screen.getByRole('combobox',{name:'Food 2'}));
+  fireEvent.click(screen.getByRole('option',{name:'Oats'}));
+  fireEvent.change(screen.getAllByLabelText('Quantity (g)')[1]!,{target:{value:'25'}});
+  expect(screen.getByText('600 kcal')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Create day'}));
+  await waitFor(()=>expect(apiRequest).toHaveBeenCalledWith('/coach/nutrition-library/days',expect.objectContaining({method:'POST'})));
+  const call=vi.mocked(apiRequest).mock.calls.find(([path,options])=>path==='/coach/nutrition-library/days'&&options?.method==='POST')!;
+  expect(JSON.parse(call[1]!.body as string)).toEqual({name:'Training day',notes:'',items:[{id:meal.id,label:'Morning'},{id:expect.any(String),type:'custom',label:'Lunch',foods:[{id:food.id,quantity:50},{id:food.id,quantity:25}]}],version:1});
+});
+
+it('shows days in a table and views mixed entries in a dedicated drawer',async()=>{
+  const meal={kind:'meals' as const,name:'Breakfast',notes:'Before training',nutrients:food.data.nutrients!,items:[{id:food.id,quantity:100,node:food.data,nutrients:food.data.nutrients!}]};
+  const day:NutritionEntry={id:'training',createdAt:food.createdAt,updatedAt:'2026-10-03',data:{kind:'days',name:'Training day',notes:'Training fuel',nutrients:{calories:600,protein:15,carbs:105,fat:12},items:[{id:'breakfast',label:'Morning',node:meal,nutrients:meal.nutrients},{id:food.id,label:'Snack',quantity:50,node:food.data,nutrients:{calories:200,protein:5,carbs:35,fat:4}}]}};
+  vi.mocked(apiRequest).mockImplementation(async path=>path.endsWith('/catalog')?{foods:[]}:{entries:[food,day],assignments:[]});
+  render(<MemoryRouter initialEntries={['/coach/studio?tab=nutrition&section=days']}><NutritionStudio clients={[]}/></MemoryRouter>);
+  const table=await screen.findByRole('table',{name:'Nutrition days'});
+  expect(within(table).getAllByRole('columnheader').map(cell=>cell.textContent)).toEqual(['Name','Entries','Macronutrients','Calories','Created at','Updated at','Action','View']);
+  expect(within(table).getByText('2')).toBeInTheDocument();
+  fireEvent.click(within(table).getByRole('button',{name:'View Training day'}));
+  const dialog=screen.getByRole('dialog',{name:'Day details'});
+  expect(dialog).toHaveClass('editor-dialog-drawer');
+  expect(within(dialog).getByText('600 kcal')).toBeInTheDocument();
+  expect(within(dialog).getByText('2 meals')).toBeInTheDocument();
+  expect(within(dialog).getByRole('heading',{name:'Meals'})).toBeInTheDocument();
+  expect(within(dialog).queryByRole('heading',{name:'Entries'})).not.toBeInTheDocument();
+  expect(within(dialog).getByText('50 g')).toBeInTheDocument();
+  const summary=within(dialog).getByText('Morning').closest('summary')!;
+  expect(within(summary).getByText('400 kcal')).toBeInTheDocument();
+  expect(summary.closest('details')).not.toHaveAttribute('open');
+  fireEvent.click(summary);
+  expect(summary.closest('details')).toHaveAttribute('open');
+  expect(within(dialog).getByText('100 g')).toBeInTheDocument();
+  expect(summary.parentElement?.querySelector(':scope > .nutrition-totals')).toBeNull();
+  expect(within(dialog).queryByText('Before training')).not.toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole('button',{name:'Edit day'}));
+  expect(screen.queryByRole('dialog',{name:'Day details'})).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Name')).toHaveValue('Training day');
+  expect(screen.getByLabelText('Quantity (g)')).toHaveValue(50);
+});
+
+it('restores grouped foods when editing a named entry and retains its identity',async()=>{
+  const entryId=crypto.randomUUID();
+  const day:NutritionEntry={id:'custom-day',version:3,createdAt:food.createdAt,data:{kind:'days',name:'Rest day',notes:'',items:[{id:entryId,label:'Breakfast',node:{kind:'meals',custom:true,name:'Breakfast',notes:'',items:[{id:food.id,quantity:50,node:food.data,nutrients:{calories:200,protein:5,carbs:35,fat:4}},{id:food.id,quantity:25,node:food.data,nutrients:{calories:100,protein:2.5,carbs:17.5,fat:2}}]}}]}};
+  vi.mocked(apiRequest).mockImplementation(async path=>path.endsWith('/catalog')?{foods:[]}:{entries:[food,day],assignments:[]});
+  render(<MemoryRouter initialEntries={['/coach/studio?tab=nutrition&section=days']}><NutritionStudio clients={[]}/></MemoryRouter>);
+  const table=await screen.findByRole('table',{name:'Nutrition days'});
+  fireEvent.click(within(table).getByRole('button',{name:'Actions for Rest day'}));
+  fireEvent.click(screen.getByRole('menuitem',{name:'Edit'}));
+  expect(screen.getByLabelText('Entry name')).toHaveValue('Breakfast');
+  expect(screen.getByRole('combobox',{name:'Food 2'})).toHaveValue('Oats');
+  fireEvent.change(screen.getByLabelText('Entry name'),{target:{value:'Lunch'}});
+  fireEvent.click(screen.getByRole('button',{name:'Save changes'}));
+  await waitFor(()=>expect(apiRequest).toHaveBeenCalledWith('/coach/nutrition-library/days/custom-day',expect.objectContaining({method:'PUT',body:JSON.stringify({name:'Rest day',notes:'',items:[{id:entryId,type:'custom',label:'Lunch',foods:[{id:food.id,quantity:50},{id:food.id,quantity:25}]}],version:3})})));
+});
+
+it('creates a plan using a saved day and a custom day with grouped foods',async()=>{
+  const day:NutritionEntry={id:'training',createdAt:food.createdAt,data:{kind:'days',name:'Training template',notes:'',nutrients:food.data.nutrients!,items:[]}};
+  vi.mocked(apiRequest).mockImplementation(async path=>path.endsWith('/catalog')?{foods:[]}:{entries:[food,day],assignments:[]});
+  render(<MemoryRouter initialEntries={['/coach/studio?tab=nutrition&section=plans']}><NutritionStudio clients={[]}/></MemoryRouter>);
+  fireEvent.click(await screen.findByRole('button',{name:'Add plan'}));
+  fireEvent.change(screen.getByLabelText('Plan name'),{target:{value:'Weekly plan'}});
+  fireEvent.change(screen.getByLabelText('Day template'),{target:{value:day.id}});
+  fireEvent.click(screen.getByRole('button',{name:'Add day'}));
+  fireEvent.change(screen.getByLabelText('Day name'),{target:{value:'Rest day'}});
+  fireEvent.change(screen.getByLabelText('Day type'),{target:{value:'custom'}});
+  fireEvent.click(screen.getByRole('button',{name:'Add meal'}));
+  fireEvent.change(screen.getByLabelText('Meal name'),{target:{value:'Breakfast'}});
+  fireEvent.click(screen.getByRole('button',{name:'Add food'}));
+  fireEvent.focus(screen.getByRole('combobox',{name:'Food 1'}));
+  fireEvent.click(screen.getByRole('option',{name:'Oats'}));
+  await waitFor(()=>expect(screen.getByLabelText('Quantity (g)')).toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText('Quantity (g)'),{target:{value:'50'}});
+  fireEvent.click(screen.getByRole('button',{name:'Add food'}));
+  fireEvent.click(screen.getByRole('button',{name:'Add food'}));
+  fireEvent.focus(screen.getByRole('combobox',{name:'Food 2'}));
+  fireEvent.click(screen.getByRole('option',{name:'Oats'}));
+  await waitFor(()=>expect(screen.getByLabelText('Quantity (g)')).toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText('Quantity (g)'),{target:{value:'25'}});
+  fireEvent.click(screen.getByRole('button',{name:'Add food'}));
+  fireEvent.click(screen.getByRole('button',{name:'Create plan'}));
+  await waitFor(()=>expect(apiRequest).toHaveBeenCalledWith('/coach/nutrition-library/plans',expect.objectContaining({method:'POST'})));
+  const call=vi.mocked(apiRequest).mock.calls.find(([path,options])=>path==='/coach/nutrition-library/plans'&&options?.method==='POST')!;
+  expect(JSON.parse(call[1]!.body as string)).toEqual({name:'Weekly plan',notes:'',version:1,items:[{id:day.id,label:'Training template'},{id:expect.any(String),type:'custom',label:'Rest day',notes:'',items:[{id:expect.any(String),type:'custom',label:'Breakfast',foods:[{id:food.id,quantity:50},{id:food.id,quantity:25}]}]}]});
+});
+
+it('views plan days and meals in the drawer and assigns a searched client',async()=>{
+  const meal={kind:'meals' as const,custom:true,name:'Breakfast',notes:'',nutrients:food.data.nutrients!,items:[{id:food.id,quantity:100,node:food.data,nutrients:food.data.nutrients!}]};
+  const day={kind:'days' as const,custom:true,name:'Training day',notes:'After training',nutrients:food.data.nutrients!,items:[{id:crypto.randomUUID(),label:'Breakfast',node:meal,nutrients:meal.nutrients}]};
+  const plan:NutritionEntry={id:'weekly',createdAt:food.createdAt,updatedAt:'2026-10-03',data:{kind:'plans',name:'Weekly plan',notes:'Build consistency',items:[{id:crypto.randomUUID(),label:'Training day',node:day}]}};
+  const client:ClientRelationship={id:'relationship',coachId:'coach',clientId:'alex',status:'APPROVED',rejectionReason:null,createdAt:food.createdAt,client:{id:'alex',email:'alex@example.com',role:'CLIENT',displayName:'Alex',businessName:null,approvalStatus:'APPROVED',createdAt:food.createdAt}};
+  let assigned=false;
+  vi.mocked(apiRequest).mockImplementation(async(path,options)=>{if(path.endsWith('/catalog'))return {foods:[]};if(options?.method==='POST'){assigned=true;return {};}return {entries:[plan,food],assignments:assigned?[{id:'assigned',clientId:'alex',planId:plan.id}]:[]};});
+  render(<MemoryRouter initialEntries={['/coach/studio?tab=nutrition&section=plans']}><NutritionStudio clients={[client]}/></MemoryRouter>);
+  const table=await screen.findByRole('table',{name:'Nutrition plans'});
+  expect(within(table).getAllByRole('columnheader').map(cell=>cell.textContent)).toEqual(['Name','Days','Assigned clients','Created at','Updated at','Action','View']);
+  fireEvent.click(within(table).getByRole('button',{name:'View Weekly plan'}));
+  const dialog=screen.getByRole('dialog',{name:'Plan details'});
+  expect(dialog).toHaveClass('editor-dialog-drawer');
+  const daySummary=within(dialog).getByText('Training day').closest('summary')!;
+  fireEvent.click(daySummary);
+  const mealSummary=within(dialog).getByText('Breakfast').closest('summary')!;
+  fireEvent.click(mealSummary);
+  expect(within(dialog).getByText('100 g')).toBeInTheDocument();
+  fireEvent.change(within(dialog).getByLabelText('Search clients'),{target:{value:'alex@example'}});
+  fireEvent.click(within(dialog).getByRole('radio',{name:/Alex/}));
+  fireEvent.click(within(dialog).getByRole('button',{name:'Assign plan'}));
+  await waitFor(()=>expect(apiRequest).toHaveBeenCalledWith('/coach/nutrition-library/plans/weekly/assign',{method:'POST',body:JSON.stringify({clientId:'alex'})}));
+  expect(await within(dialog).findByText('Assigned clients')).toBeInTheDocument();
+  await waitFor(()=>expect(within(dialog).getByRole('button',{name:'Edit plan'})).toBeEnabled());
+  fireEvent.click(within(dialog).getByRole('button',{name:'Edit plan'}));
+  fireEvent.click(screen.getByRole('button',{name:'Edit day Training day'}));
+  expect(screen.getByLabelText('Day name')).toHaveValue('Training day');
+  fireEvent.click(screen.getByRole('button',{name:'Edit meal Breakfast'}));
+  expect(screen.getByLabelText('Meal name')).toHaveValue('Breakfast');
+  fireEvent.click(screen.getByRole('button',{name:'Edit food Oats'}));
+  expect(screen.getByLabelText('Quantity (g)')).toHaveValue(100);
+});
+
+beforeEach(()=>{render(<GlobalNotifications/>);});
+
+it('opens incomplete collapsed plan meals and confirms structural changes on cancel',async()=>{
+  vi.mocked(apiRequest).mockImplementation(async path=>path.endsWith('/catalog')?{foods:[]}:{entries:[food],assignments:[]});
+  render(<MemoryRouter initialEntries={['/coach/studio?tab=nutrition&section=plans']}><NutritionStudio clients={[]}/></MemoryRouter>);
+  fireEvent.click(await screen.findByRole('button',{name:'Add plan'}));
+  fireEvent.change(screen.getByLabelText('Plan name'),{target:{value:'Weekly plan'}});
+  fireEvent.change(screen.getByLabelText('Day name'),{target:{value:'Training'}});
+  fireEvent.change(screen.getByLabelText('Day type'),{target:{value:'custom'}});
+  fireEvent.click(screen.getByRole('button',{name:'Add meal'}));
+  expect(screen.getByText('No foods added yet.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Done with meal'}));
+  fireEvent.click(screen.getByRole('button',{name:'Done with day'}));
+  expect(screen.queryByLabelText('Meal name')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Create plan'}));
+  expect(await screen.findByLabelText('Meal name')).toHaveAttribute('aria-invalid','true');
+  expect(screen.getByText('Add at least one food to this meal.')).toBeInTheDocument();
+  expect(vi.mocked(apiRequest).mock.calls.some(([,options])=>options?.method==='POST')).toBe(false);
+  fireEvent.click(screen.getByRole('button',{name:'Cancel'}));
+  expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Keep editing'}));
+  expect(screen.getByLabelText('Meal name')).toBeInTheDocument();
 });

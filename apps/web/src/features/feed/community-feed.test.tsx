@@ -1,12 +1,14 @@
+import { GlobalNotifications } from '../../components/global-notifications';
+import { notify } from '../../lib/notify';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { apiBlob, apiRequest } from '../../lib/api';
 import { CommunityFeed } from './community-feed';
 
 vi.mock('../../lib/api', () => ({ apiRequest: vi.fn(), apiBlob: vi.fn() }));
 vi.mock('../auth/auth-context', () => ({ useAuth: () => ({ ready: true, user: { id: 'client', displayName: 'Aman', role: 'CLIENT', approvalStatus: 'APPROVED' } }) }));
-afterEach(() => { cleanup(); vi.resetAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { notify.dismiss(); cleanup(); vi.resetAllMocks(); vi.unstubAllGlobals(); });
 const post = { id: 'post', body: 'First 5K complete!', authorName: 'Aman', isCoach: false, createdAt: '2026-09-19T12:00:00Z', canDelete: true, attachments: [], liked: false, likeCount: 0, commentCount: 0 };
 
 it('publishes a status with clear audience information and resets the composer', async () => {
@@ -18,6 +20,7 @@ it('publishes a status with clear audience information and resets the composer',
   fireEvent.change(screen.getByLabelText('Write a community post'), { target: { value: 'First 5K complete!' } });
   fireEvent.click(screen.getByRole('button', { name: 'Share post' }));
   await waitFor(() => expect(apiRequest).toHaveBeenCalledWith('/feed/posts', { method: 'POST', body: JSON.stringify({ body: 'First 5K complete!', attachments: [] }) }));
+
   await screen.findByText('Your post was shared with the community.');
   expect(screen.getByLabelText('Write a community post')).toHaveValue('');
 });
@@ -60,3 +63,5 @@ it('loads private photos through authenticated requests and revokes preview URLs
   view.unmount();
   expect(revokeObjectURL).toHaveBeenCalledWith('blob:private');
 });
+
+beforeEach(()=>{render(<GlobalNotifications/>);});

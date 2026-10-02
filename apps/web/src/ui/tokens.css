@@ -1,0 +1,32 @@
+:root {
+  /* The existing Forme palette and display face remain the theme. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-panel: 16px;
+  --radius-pill: 999px;
+  --control-height: 42px;
+  --color-primary: #087957;
+  --color-primary-hover: #056747;
+  --color-muted: #637169;
+  --color-border: #dde3d9;
+  --color-surface: #fff;
+  --color-surface-subtle: #f5f8f6;
+  --color-danger: #a32d25;
+  --font-helper: .75rem;
+  --font-body: .875rem;
+  --font-section: 1.25rem;
+  --weight-label: 600;
+  --weight-heading: 700;
+  --shadow-panel: 0 3px 5px #19352b03, 0 12px 30px #19352b05;
+  --transition-control: 150ms ease;
+}

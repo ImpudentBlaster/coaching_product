@@ -1,3 +1,4 @@
+import { notify } from '../../lib/notify';
 import { Collection } from '../../components/collection';
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
@@ -16,8 +17,8 @@ export function AdminDashboard() {
   useEffect(() => { const status = searchParams.get('status'); if (status === 'PENDING_REVIEW' || status === 'APPROVED' || status === 'REJECTED' || status === 'SUSPENDED' || status === 'ALL') setFilter(status); }, [searchParams]);
   if (!ready) return <p>Loading session…</p>; if (!user) return <Navigate to="/login" replace />; if (user.role !== 'PLATFORM_ADMIN') return <Navigate to="/" replace />;
 
-  async function transition(coach: User, action: 'approve' | 'reject' | 'suspend' | 'reopen') { const needsReason = action === 'reject' || action === 'suspend'; const reason = needsReason ? window.prompt(`Reason to ${action} this coach?`) : null; if (needsReason && !reason) return; setBusyId(coach.id); setError(''); try { await apiRequest(`/admin/coaches/${coach.id}/${action}`, { method: 'POST', body: JSON.stringify(reason ? { reason } : {}) }); await load(); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to update coach'); } finally { setBusyId(''); } }
-  async function issueReset(coach: User) { setBusyId(coach.id); setError(''); try { const result = await apiRequest<{ reset: { token: string } }>(`/admin/users/${coach.id}/password-reset`, { method: 'POST', body: '{}' }); setResetCode(result.reset.token); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to issue reset'); } finally { setBusyId(''); } }
+  async function transition(coach: User, action: 'approve' | 'reject' | 'suspend' | 'reopen') { const needsReason = action === 'reject' || action === 'suspend'; const reason = needsReason ? window.prompt(`Reason to ${action} this coach?`) : null; if (needsReason && !reason) return; setBusyId(coach.id); setError(''); try { await apiRequest(`/admin/coaches/${coach.id}/${action}`, { method: 'POST', body: JSON.stringify(reason ? { reason } : {}) }); await load(); } catch (caught) { notify.error(caught instanceof Error ? caught.message : 'Unable to update coach'); } finally { setBusyId(''); } }
+  async function issueReset(coach: User) { setBusyId(coach.id); setError(''); try { const result = await apiRequest<{ reset: { token: string } }>(`/admin/users/${coach.id}/password-reset`, { method: 'POST', body: '{}' }); setResetCode(result.reset.token); } catch (caught) { notify.error(caught instanceof Error ? caught.message : 'Unable to issue reset'); } finally { setBusyId(''); } }
   const visible = filter === 'ALL' ? coaches : coaches.filter((coach) => coach.approvalStatus === filter);
   return <section><div className="dashboard-head"><div><p className="eyebrow">Platform control</p><h1>Admin dashboard</h1><p className="lede">Approve coaches, protect access, and review every sensitive change.</p></div><button className="secondary" onClick={() => void load()}>Refresh data</button></div>
     {error && <p className="error" role="alert">{error}</p>}

@@ -29,9 +29,25 @@ it('shows errors distinctly from empty results and supports retry',()=>{
 it('protects unsaved input when closing an editor',()=>{
   HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
   HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
-  const close=vi.fn();const confirm=vi.spyOn(window,'confirm').mockReturnValue(false);
+  const close=vi.fn();const confirm=vi.spyOn(window,'confirm');
   render(<EditorDialog title="Edit meal" onClose={close}><label>Name<input/></label></EditorDialog>);
   fireEvent.change(screen.getByLabelText('Name'),{target:{value:'Lunch'}});
   fireEvent.click(screen.getByRole('button',{name:'Close form'}));expect(close).not.toHaveBeenCalled();
-  confirm.mockReturnValue(true);fireEvent.click(screen.getByRole('button',{name:'Close form'}));expect(close).toHaveBeenCalledOnce();
+  expect(screen.getByRole('button',{name:'Keep editing'})).toHaveFocus();
+  fireEvent.click(screen.getByRole('button',{name:'Keep editing'}));
+  expect(screen.queryByRole('region',{name:'Unsaved changes'})).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Name')).toHaveValue('Lunch');
+  fireEvent.click(screen.getByRole('button',{name:'Close form'}));
+  fireEvent.keyDown(screen.getByRole('button',{name:'Keep editing'}),{key:'Tab'});
+  expect(screen.getByRole('button',{name:'Discard changes'})).toHaveFocus();
+  fireEvent.keyDown(screen.getByRole('button',{name:'Discard changes'}),{key:'Escape'});
+  expect(screen.queryByRole('region',{name:'Unsaved changes'})).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Close form'}));
+  fireEvent.click(screen.getByRole('button',{name:'Discard changes'}));expect(close).toHaveBeenCalledOnce();
+  expect(confirm).not.toHaveBeenCalled();
+});
+it('closes an unchanged drawer immediately',()=>{
+  const close=vi.fn();render(<EditorDialog title="Program details" variant="drawer" onClose={close}><p>Program content</p></EditorDialog>);
+  fireEvent.click(screen.getByRole('button',{name:'Close dialog'}));
+  expect(close).toHaveBeenCalledOnce();expect(screen.queryByRole('region',{name:'Unsaved changes'})).not.toBeInTheDocument();
 });

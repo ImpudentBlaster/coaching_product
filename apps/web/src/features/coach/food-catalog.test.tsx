@@ -1,0 +1,31 @@
+import '@testing-library/jest-dom/vitest';
+import { cleanup,fireEvent,render,screen,waitFor } from '@testing-library/react';
+import { afterEach,beforeEach,expect,it,vi } from 'vitest';
+import { GlobalNotifications } from '../../components/global-notifications';
+import { notify } from '../../lib/notify';
+import { apiRequest } from '../../lib/api';
+import { FoodCatalog } from './food-catalog';
+vi.mock('../../lib/api',()=>({apiRequest:vi.fn()}));
+beforeEach(()=>{render(<GlobalNotifications/>);});
+afterEach(()=>{notify.dismiss();cleanup();vi.resetAllMocks();});
+const food={id:'usda-171477',libraryEntryId:'private-copy',category:'Protein',source:{name:'USDA',url:'https://fdc.nal.usda.gov/food-details/171477/nutrients'},data:{kind:'foods' as const,name:'Chicken breast, roasted',notes:'',servingSize:100,unit:'g',nutrients:{calories:165,protein:31.02,carbs:0,fat:3.57}}};
+it('searches starter foods and adds an editable copy to the existing library',async()=>{
+  vi.mocked(apiRequest).mockResolvedValueOnce({foods:[food]}).mockResolvedValueOnce({entry:{id:food.libraryEntryId}});
+  const added=vi.fn().mockResolvedValue(undefined);const view=render(<FoodCatalog entries={[]} onAdded={added}/>);
+  await screen.findByText(food.data.name);expect(screen.getByText('1 foods available')).toBeInTheDocument();expect(screen.getByPlaceholderText('Search foods…')).toBeInTheDocument();expect(screen.getByText('Per 100 g')).toBeInTheDocument();
+  fireEvent.change(screen.getByRole('searchbox'),{target:{value:'rice'}});expect(screen.queryByText(food.data.name)).not.toBeInTheDocument();expect(screen.getByRole('heading',{name:'No foods found'})).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Clear search'}));
+  fireEvent.click(screen.getByRole('button',{name:'Add to my foods'}));
+  await waitFor(()=>expect(added).toHaveBeenCalledOnce());
+  expect(apiRequest).toHaveBeenLastCalledWith('/coach/nutrition-library/catalog/usda-171477/add',{method:'POST',body:'{}'});
+  view.rerender(<FoodCatalog entries={[{id:food.libraryEntryId,data:food.data,createdAt:'2026-09-20'}]} onAdded={added}/>);
+  expect(screen.getByText('Added')).toBeInTheDocument();
+  expect(screen.queryByRole('button',{name:'Added to my foods'})).not.toBeInTheDocument();
+});
+it('lets coaches retry failed additions',async()=>{
+  vi.mocked(apiRequest).mockResolvedValueOnce({foods:[food]}).mockRejectedValueOnce(new Error('Unable to save food'));
+  render(<FoodCatalog entries={[]} onAdded={vi.fn()}/>);
+  fireEvent.click(await screen.findByRole('button',{name:'Add to my foods'}));
+  expect(await screen.findByText('Unable to save food')).toBeInTheDocument();
+  expect(screen.getByRole('button',{name:'Add to my foods'})).toBeEnabled();
+});

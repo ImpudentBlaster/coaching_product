@@ -33,7 +33,7 @@ describe.skipIf(!process.env.DATABASE_URL)('custom exercise PostgreSQL workflow'
   const app = express(); app.use(express.json({ limit: '12mb' })); app.use(createMvpRouter(environment, pool));
   beforeAll(async () => {
     await admin.query(`CREATE SCHEMA ${schema}`);
-    for (const file of ['001_identity_approvals.sql', '002_demo_mvp.sql', '009_custom_exercises.sql']) await pool.query(await readFile(new URL(`../../../db/migrations/${file}`, import.meta.url), 'utf8'));
+    for (const file of ['001_identity_approvals.sql', '002_demo_mvp.sql', '010_program_exercise_days.sql', '009_custom_exercises.sql']) await pool.query(await readFile(new URL(`../../../db/migrations/${file}`, import.meta.url), 'utf8'));
     for (const [id, role] of [[coach, 'COACH'], [other, 'COACH'], [client, 'CLIENT'], [suspended, 'COACH']]) await pool.query("INSERT INTO users(id,email,password_hash,role,account_status) VALUES($1,$2,'unused-test-hash',$3,$4)", [id, `${id}@example.test`, role, id === suspended ? 'SUSPENDED' : 'APPROVED']);
     await pool.query("INSERT INTO coach_clients(coach_id,client_id,status) VALUES($1,$2,'APPROVED')", [coach, client]);
     for (let index = 0; index < 7; index++) await pool.query("INSERT INTO exercises(external_id,name,body_part,equipment,target,instructions) VALUES($1,$2,'waist','body weight','abs','[\"Move slowly\"]')", [index === 0 ? '0001' : `test-${index}`, `Public exercise ${index}`]);
@@ -62,6 +62,8 @@ describe.skipIf(!process.env.DATABASE_URL)('custom exercise PostgreSQL workflow'
     const workout = { name: 'Custom workout', description: '', exercises: [{ exerciseId: exercise.id, sets: 3, repetitions: 10 }] };
     expect((await request(app).post('/coach/workout-templates').set('Authorization', token(other)).send(workout)).status).toBe(409);
     expect((await request(app).post('/coach/workout-templates').set('Authorization', token(coach)).send(workout)).status).toBe(201);
+    const templates = await request(app).get('/coach/workout-templates').set('Authorization', token(coach));
+    expect(templates.body).toMatchObject({ templates: [{ exercises: [{ exerciseId: exercise.id, instructions: input.instructions, gifAvailable: true }] }] });
     await pool.query("UPDATE coach_clients SET status='SUSPENDED' WHERE client_id=$1", [client]);
     expect((await request(app).get(`/exercises/${exercise.id}/gif`).set('Authorization', token(client, 'CLIENT'))).status).toBe(404);
     await pool.query("UPDATE coach_clients SET status='APPROVED' WHERE client_id=$1", [client]);

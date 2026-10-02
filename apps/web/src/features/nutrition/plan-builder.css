@@ -1,0 +1,45 @@
+.editor-dialog:has(.nutrition-plan-builder) { width: min(860px, calc(100vw - 32px)); }
+.editor-dialog:has(.nutrition-plan-builder) > header { position: relative; top: auto; }
+.editor-footer { flex: 0 0 auto; padding: var(--space-4) var(--space-5); border-top: 1px solid var(--color-border); background: var(--color-surface); display: flex; justify-content: flex-end; gap: var(--space-2); flex-wrap: wrap; }
+.plan-builder-fields { border: 0; margin: 0; padding: 0; display: grid; gap: var(--space-5); }
+.nutrition-plan-builder .form-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.builder-plan-info { display: grid; gap: var(--space-3); }
+.builder-days { border-top: 1px solid var(--color-border); padding-top: var(--space-5); }
+.builder-section-title { font-size: .78rem; font-weight: 650; text-transform: uppercase; letter-spacing: .05em; color: var(--color-muted); margin: 0 0 var(--space-3); }
+.builder-sections { display: grid; gap: var(--space-3); margin-bottom: var(--space-3); }
+.builder-section { min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-card); overflow: visible; background: var(--color-surface); }
+.builder-summary-row { display: flex; align-items: center; gap: var(--space-2); padding-right: var(--space-2); background: var(--color-surface-subtle); border-radius: var(--radius-card); }
+.builder-toggle { border: 0; background: transparent; padding: var(--space-3) var(--space-4); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex: 1; min-width: 0; text-align: left; color: inherit; border-radius: var(--radius-card); }
+.builder-toggle > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.builder-toggle strong, .builder-toggle small { display: block; }
+.builder-toggle strong { font-size: 1rem; font-weight: 600; }
+.builder-toggle small { font-size: .8rem; color: var(--color-muted); line-height: 1.5; }
+.builder-chevron { flex-shrink: 0; font-size: 1.1rem; }
+.builder-summary-row:has([aria-expanded=true]) { background: #edf5ef; }
+.builder-section-content { display: grid; gap: var(--space-3); padding: var(--space-4); border-top: 1px solid var(--color-border); min-width: 0; }
+.builder-section-content > .secondary { justify-self: start; }
+.builder-meal { border-radius: var(--radius-control); }
+.builder-meal .builder-summary-row, .builder-meal .builder-toggle { border-radius: var(--radius-control); }
+.builder-empty { margin: 0 0 var(--space-3); color: var(--color-muted); font-size: .85rem; line-height: 1.5; }
+.builder-food-list { list-style: none; padding: 0; margin: 0; }
+.builder-food-list > li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; }
+.builder-food-list > li + li { border-top: 1px solid var(--color-border); }
+.builder-food-list > li > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.builder-food-list strong { display: block; font-weight: 600; font-size: .9rem; }
+.builder-food-list small { display: block; color: var(--color-muted); font-size: .8rem; }
+.builder-food-list .actions { flex-shrink: 0; }
+.builder-food-editor { display: grid; gap: var(--space-3); padding: var(--space-3); background: var(--color-surface-subtle); border-radius: var(--radius-control); min-width: 0; }
+.builder-food-editor h5 { font-size: .9rem; margin: 0; }
+.builder-food-editor .actions { justify-content: flex-end; flex-wrap: wrap; }
+.builder-totals { border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+.builder-totals > small { display: block; margin-bottom: var(--space-1); color: var(--color-muted); font-size: .75rem; }
+.nutrition-plan-builder .nutrition-totals { display: flex; flex-wrap: wrap; margin: 0; gap: var(--space-2) var(--space-3); font-size: .85rem; }
+.builder-field-error { color: var(--color-danger); font-size: .8rem; line-height: 1.5; margin: var(--space-1) 0 0; }
+.builder-section.is-invalid { border-color: var(--color-danger); }
+.builder-toggle:focus-visible { outline-offset: -3px; }
+@media(max-width:540px) {
+  .nutrition-plan-builder .form-row { grid-template-columns: minmax(0, 1fr); }
+  .editor-dialog:has(.nutrition-plan-builder) { width: 100vw; }
+  .editor-footer { padding: var(--space-3) var(--space-4); padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom)); }
+  .builder-section-content { padding: var(--space-3); }
+}
