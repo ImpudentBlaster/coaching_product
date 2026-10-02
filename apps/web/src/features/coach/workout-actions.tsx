@@ -37,20 +37,21 @@ export function WorkoutActions({ workout, onEdit, onDeleted, onMessage, disabled
       { label: 'Edit', onSelect: onEdit },
       { label: 'Delete', danger: true, onSelect: () => { setError(''); setPanel('delete'); } },
     ]}/></Cell>
-    <Cell className="workout-view-cell"><button type="button" className="secondary workout-icon-action" title="View workout" aria-label={`View ${workout.name}`} disabled={disabled || deleting} onClick={() => setPanel('view')}>
+    <Cell className="workout-view-cell"><button type="button" className="secondary icon-button workout-icon-action" title="View workout" aria-label={`View ${workout.name}`} disabled={disabled || deleting} onClick={() => setPanel('view')}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
     </button></Cell>
-    {panel === 'view' && <EditorDialog title="Workout details" variant="drawer" onClose={() => setPanel(null)}>
-      <div className="workout-details">
-        <div className="workout-details-heading"><div><h3>{workout.name}</h3><p>{workout.exercises.length} exercises</p></div><button type="button" className="secondary" onClick={() => { setPanel(null); onEdit(); }}>Edit workout</button></div>
-        <p className="workout-description">{workout.description || 'No description added.'}</p>
+    {panel === 'view' && <EditorDialog title="Workout details" variant="drawer" onClose={() => setPanel(null)} headerContent={<div className="workout-details-heading"><div><h3>{workout.name}</h3><p>{workout.exercises.length} {workout.exercises.length === 1 ? 'exercise' : 'exercises'}</p></div><button type="button" className="primary" onClick={() => { setPanel(null); onEdit(); }}>Edit workout</button></div>}>
+      <div className="workout-details detail-view">
+        <section className="detail-section" aria-label="Workout information"><h4 className="detail-section-title">Workout information</h4><p className="workout-description">{workout.description || 'No description added.'}</p></section>
+        <section className="detail-section" aria-label="Exercises"><h4 className="detail-section-title">Exercises</h4>
         <WorkoutExerciseDetails exercises={workout.exercises}/>
         {!workout.exercises.length && <p>No exercises added yet.</p>}
+        </section>
       </div>
     </EditorDialog>}
     {panel === 'delete' && <EditorDialog title="Delete workout?" variant="confirmation" busy={deleting} onClose={() => setPanel(null)}>
       <p>Delete <strong>{workout.name}</strong> from your workout library? Existing assigned workouts will be preserved.</p>
-      <Notice message={error} error onClear={() => setError('')}/>
+      <Notice transient message={error} error onClear={() => setError('')}/>
       <div className="workout-confirm-actions"><button type="button" className="secondary" disabled={deleting} onClick={() => setPanel(null)}>Cancel</button><button type="button" className="danger" disabled={deleting} onClick={() => void remove()}>{deleting ? 'Deleting…' : 'Delete workout'}</button></div>
     </EditorDialog>}
   </>;

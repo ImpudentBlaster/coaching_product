@@ -1,11 +1,13 @@
 import '@testing-library/jest-dom/vitest';
+import { GlobalNotifications } from '../../components/global-notifications';
+import { notify } from '../../lib/notify';
 import { useState } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { apiRequest } from '../../lib/api';
 import { AssignedProgramClients } from './assigned-program-clients';
 vi.mock('../../lib/api', () => ({ apiRequest: vi.fn() }));
-afterEach(() => { cleanup(); vi.resetAllMocks(); });
+afterEach(() => { notify.dismiss(); cleanup(); vi.resetAllMocks(); });
 function Harness() { const [busy,setBusy] = useState(false); return <AssignedProgramClients programId="p1" busy={busy} onBusy={setBusy}/>; }
 it('loads current clients and confirms removal before refreshing the list', async () => {
   vi.mocked(apiRequest).mockResolvedValueOnce({ items: [{id:'a1',clientId:'c1',name:'Alex',email:'alex@example.test'}], hasMore:false }).mockResolvedValueOnce(undefined).mockResolvedValueOnce({ items:[],hasMore:false });
@@ -29,3 +31,17 @@ it('retains the client and confirmation when removal fails', async () => {
   expect(screen.getByRole('button', {name:'Remove program from Alex'})).toBeEnabled();
   expect(screen.getByRole('button', {name:'Remove assignment'})).toBeEnabled();
 });
+
+it('keeps multiple assigned clients distinct and targets the chosen removal', async () => {
+  vi.mocked(apiRequest).mockResolvedValueOnce({ items: [{ id: 'a1', clientId: 'c1', name: 'Alex', email: 'alex@example.test' }, { id: 'a2', clientId: 'c2', name: 'Sam', email: 'sam@example.test' }], hasMore: false });
+  render(<Harness/>);
+  expect(await screen.findByRole('button', { name: 'Remove program from Alex' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Remove program from Sam' }));
+  expect(screen.getByRole('group', { name: 'Confirm removal' })).toHaveTextContent('Sam');
+  expect(apiRequest).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(screen.getByRole('button', { name: 'Remove program from Alex' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Remove program from Sam' })).toBeInTheDocument();
+});
+
+beforeEach(()=>{render(<GlobalNotifications/>);});

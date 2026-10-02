@@ -1,3 +1,4 @@
+import { Notice } from '../../components/editor-dialog';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { apiBlob, apiRequest } from '../../lib/api';
@@ -98,7 +99,7 @@ function Composer({ name, onPosted }: { name: string; onPosted: () => void }) {
     <div className="feed-person"><div className="avatar">{name.charAt(0).toUpperCase()}</div><div><strong>{name}</strong><small>Sharing with your coach and their approved clients</small></div></div>
     <label className="feed-compose-label"><span className="sr-only">Write a community post</span><textarea value={body} onChange={event => setBody(event.target.value)} disabled={busy} maxLength={5000} placeholder="What’s happening in your fitness journey?" rows={3} /></label>
     {files.length > 0 && <ul className="feed-pending-files">{files.map((file, index) => <li key={`${file.name}-${index}`}><DraftFile file={file} /><span>{file.name}<small>{formatSize(file.size)}</small></span><button type="button" disabled={busy} aria-label={`Remove ${file.name}`} onClick={() => setFiles(previous => previous.filter((_, position) => position !== index))}>×</button></li>)}</ul>}
-    {error && <p className="error" role="alert">{error}</p>}{status && <p className="feed-success" role="status">{status}</p>}
+    {error && <p className="error" role="alert">{error}</p>}<Notice message={status} onClear={()=>setStatus('')}/>
     <div className="feed-compose-actions"><div><input ref={photoInput} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={event => { addFiles(event.target.files); event.target.value = ''; }} /><input ref={fileInput} type="file" multiple hidden onChange={event => { addFiles(event.target.files); event.target.value = ''; }} /><button type="button" disabled={busy} onClick={() => photoInput.current?.click()}><span aria-hidden="true">▧</span> Photo</button><button type="button" disabled={busy} onClick={() => fileInput.current?.click()}><span aria-hidden="true">＋</span> File</button></div><small>{body.length}/5,000</small><button type="submit" className="primary" disabled={busy || (!body.trim() && files.length === 0)}>{busy ? 'Sharing…' : 'Share post'}</button></div>
     <p className="feed-limits">Up to 4 attachments · Photos 8 MB · Files 10 MB · 20 MB total</p>
   </form>;

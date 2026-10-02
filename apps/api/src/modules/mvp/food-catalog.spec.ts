@@ -65,4 +65,5 @@ describe.skipIf(!process.env.DATABASE_URL)('starter food copies',()=>{
     await pool.query("UPDATE users SET account_status='SUSPENDED' WHERE id=$1",[other]);
     expect((await request(app).get(`${root}/catalog`).set('Authorization',token(other,'COACH'))).status).toBe(403);
   });
+
 });

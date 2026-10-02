@@ -24,7 +24,7 @@ export function ActionMenu({ name, items, disabled = false }: { name: string; it
     return () => { document.removeEventListener('pointerdown', outside); window.removeEventListener('resize', dismiss); window.removeEventListener('scroll', dismiss, true); };
   }, [position]);
   return <>
-    <button ref={trigger} type="button" className="secondary workout-icon-action" title="Actions" aria-label={`Actions for ${name}`} aria-haspopup="menu" aria-expanded={!!position} aria-controls={position ? id : undefined} disabled={disabled}
+    <button ref={trigger} type="button" className="secondary icon-button workout-icon-action" title="Actions" aria-label={`Actions for ${name}`} aria-haspopup="menu" aria-expanded={!!position} aria-controls={position ? id : undefined} disabled={disabled}
       onClick={() => position ? close() : open()} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); open(); } }}>
       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
     </button>

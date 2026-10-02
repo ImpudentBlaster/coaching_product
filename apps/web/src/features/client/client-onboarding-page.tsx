@@ -1,3 +1,4 @@
+import { Notice } from '../../components/editor-dialog';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiRequest } from '../../lib/api';
@@ -61,7 +62,7 @@ export function ClientOnboardingPage() {
           </label>;
         })}</div>
       </fieldset>)}
-      <div className="card onboarding-actions">{error&&<p role="alert" className="error">{error}</p>}{message&&<p role="status">{message}</p>}
+      <div className="card onboarding-actions">{error&&<p role="alert" className="error">{error}</p>}<Notice message={message} onClear={()=>setMessage('')}/>
         {locked?<Link className="primary link-button" to="/client">Go to dashboard</Link>:<><p>Your coach can view saved drafts. Once submitted, your answers are locked for review.</p><div className="actions"><button className="secondary" type="button" disabled={busy} onClick={()=>void save(false)}>Save draft</button><button className="primary" type="submit" disabled={busy}>{busy?'Saving…':'Submit questionnaire'}</button></div></>}
       </div>
     </form>

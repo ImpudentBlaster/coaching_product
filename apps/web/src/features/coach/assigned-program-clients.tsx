@@ -32,7 +32,7 @@ export function AssignedProgramClients({ programId, busy, onBusy, externalRevisi
     finally { onBusy(false); }
   }
   return <section className="assigned-program-clients" aria-label="Currently assigned clients">
-    <h4>Currently assigned to</h4>
+    <h5 className="detail-section-title">Assigned clients</h5>
     <Notice message={message} onClear={() => setMessage('')}/>
     <Notice message={error} error onClear={() => setError('')}/>
     {error && !removing && <button type="button" className="secondary" disabled={busy} onClick={() => setRevision(value => value + 1)}>Retry assigned clients</button>}

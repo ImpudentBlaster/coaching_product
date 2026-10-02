@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiRequest } from '../../lib/api';
+import { notify } from '../../lib/notify';
 
 type ClientOption = { id: string; name: string; email: string; assignmentId: string | null };
 export function ProgramAssignment({ programId, busy, onBusy, revision, onChanged }: { programId: string; busy: boolean; onBusy: (value: boolean) => void; revision: number; onChanged: () => void }) {
   const saving = useRef(false);
-  const [message, setMessage] = useState('');
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<ClientOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -29,7 +29,7 @@ export function ProgramAssignment({ programId, busy, onBusy, revision, onChanged
   }, [search, retry, programId, revision]);
   async function toggle(client: ClientOption) {
     if (busy || saving.current) return;
-    saving.current = true; onBusy(true); setMessage('');
+    saving.current = true; onBusy(true);
     try {
       let assignmentId: string | null = null;
       if (client.assignmentId) {
@@ -39,22 +39,23 @@ export function ProgramAssignment({ programId, busy, onBusy, revision, onChanged
         assignmentId = result.assignments[0]!.id;
       }
       setItems(current => current.map(item => item.id === client.id ? { ...item, assignmentId } : item));
-      setMessage(client.assignmentId ? 'Program removed from ' + client.name + '.' : 'Program assigned to ' + client.name + '.');
+      notify.success(client.assignmentId ? 'Program removed from ' + client.name + '.' : 'Program assigned to ' + client.name + '.');
       onChanged();
-    } catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Unable to update assignment. Please try again.'); }
+    } catch (cause) { notify.error(cause instanceof Error ? cause.message : 'Unable to update assignment. Please try again.'); }
     finally { saving.current = false; onBusy(false); }
   }
   return <section className="program-assign-controls" aria-label="Assign to clients">
-    <h4>Assign to clients</h4>
+    <p className="assignment-help assignment-intro">Check a client to assign this program; uncheck to remove it. Changes save immediately. Assigning replaces their current program.</p>
     <label>Search clients<input type="search" placeholder="Search by name or email…" maxLength={180} value={query} disabled={busy} onChange={event => setQuery(event.target.value)}/></label>
     {search && <div className="assignment-client-list" aria-label="Client search results" aria-busy={loading}>
+      <h5 className="assignment-results-heading">Search results</h5>
       {loading ? <p role="status">Searching clients…</p> : error ? <div role="alert"><p>{error}</p><button type="button" className="secondary" onClick={() => setRetry(value => value + 1)}>Try again</button></div> : items.length ? items.map(client => <label className="assignment-client-option" key={client.id}>
         <input type="checkbox" checked={!!client.assignmentId} disabled={busy} onChange={() => void toggle(client)}/>
         <span><strong>{client.name}</strong><small>{client.email}</small></span>
       </label>) : <p role="status">{search ? 'No clients match your search.' : 'No approved clients available.'}</p>}
     </div>}
-    {message && <p role="status">{message}</p>}
+    {!search && <p className="detail-empty">Search by name or email to find clients.</p>}
     {hasMore && <p>Showing the first 50 clients. Refine your search to find more.</p>}
-    <p className="assignment-help">Check a client to assign this program; uncheck to remove it. Changes save immediately. Assigning replaces their current program.</p>
+
   </section>;
 }

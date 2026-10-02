@@ -1,12 +1,14 @@
+import { GlobalNotifications } from '../../components/global-notifications';
+import { notify } from '../../lib/notify';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { apiRequest, type Exercise } from '../../lib/api';
 import { WorkoutTemplateForm } from './workout-template-form';
 
 vi.mock('../../lib/api', () => ({ apiRequest: vi.fn() }));
 vi.mock('../../components/exercise-gif', () => ({ ExerciseGif: ({ name }: { name: string }) => <img alt={`${name} demonstration`} /> }));
-afterEach(() => { cleanup(); vi.resetAllMocks(); });
+afterEach(() => { notify.dismiss(); cleanup(); vi.resetAllMocks(); });
 const exercises = [
   { id: 'squat', name: 'Squat', target: 'quads' },
   { id: 'row', name: 'Row', target: 'back' },
@@ -49,7 +51,9 @@ it('keeps remaining exercise settings when removing a row and preserves a failed
   expect(screen.getByLabelText('Sets')).toHaveValue(5);
   expect(screen.getByRole('button', { name: 'Remove exercise 1' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Create template' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Unable to save');
+  expect(await screen.findByText('Unable to save')).toBeInTheDocument();
   expect(screen.getByRole('combobox')).toHaveValue('Row');
   expect(screen.getByLabelText('Sets')).toHaveValue(5);
 });
+
+beforeEach(()=>{render(<GlobalNotifications/>);});

@@ -1,7 +1,9 @@
+import { GlobalNotifications } from '../../components/global-notifications';
+import { notify } from '../../lib/notify';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { apiRequest } from '../../lib/api';
 import { useAuth } from '../auth/auth-context';
 import { ClientOnboardingPage } from './client-onboarding-page';
@@ -10,7 +12,7 @@ import { CoachOnboarding } from '../coach/coach-onboarding';
 import type { Onboarding } from './onboarding-types';
 vi.mock('../../lib/api',()=>({apiRequest:vi.fn()}));
 vi.mock('../auth/auth-context',()=>({useAuth:vi.fn()}));
-afterEach(()=>{cleanup();vi.resetAllMocks();});
+afterEach(()=>{notify.dismiss();cleanup();vi.resetAllMocks();});
 const data = {personalDetails:'Office worker',age:30,fitnessGoal:'Build strength',height:175,weight:72,waist:80,experienceLevel:'BEGINNER',injuries:'',availableEquipment:['Dumbbells'],preferredTrainingDays:['Monday'],currentDiet:'Three meals a day',nutritionPreferences:'Vegetarian',additionalNotes:''};
 const draft:Onboarding = {id:'test',status:'DRAFT',data,submittedAt:null,reviewedAt:null};
 function page() {
@@ -68,3 +70,5 @@ it('lets the coach review submitted answers',async()=>{
   await waitFor(()=>expect(screen.getByText('Reviewed')).toBeInTheDocument());
   expect(apiRequest).toHaveBeenLastCalledWith('/coach/clients/client/onboarding/review',{method:'POST',body:'{}'});
 });
+
+beforeEach(()=>{render(<GlobalNotifications/>);});

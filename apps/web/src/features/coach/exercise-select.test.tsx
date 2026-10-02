@@ -19,6 +19,7 @@ it('searches and selects from the same input and submits the selected ID', async
   fireEvent.change(input, { target: { value: 'cable' } });
   expect(await screen.findByRole('option', { name: /Cable row/ })).toBeInTheDocument();
   expect(apiRequest).toHaveBeenCalledWith('/exercises?q=cable&limit=50');
+  expect(screen.getByAltText('Cable row demonstration')).toHaveAttribute('src', '/preview/cable-row');
   fireEvent.keyDown(input, { key: 'ArrowDown' });
   fireEvent.keyDown(input, { key: 'Enter' });
   expect(input).toHaveValue('Cable row');

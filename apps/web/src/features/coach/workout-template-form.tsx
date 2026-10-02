@@ -49,7 +49,7 @@ export function WorkoutTemplateForm({ exercises, onSaved, onMessage, initial, on
     }
   }
 
-  return <form className="card profile-card vertical" onSubmit={save}><Notice message={error} error onClear={()=>setError('')}/>
+  return <form className="card profile-card vertical" onSubmit={save}><Notice transient message={error} error onClear={()=>setError('')}/>
     <h2>{initial?'Edit workout template':'Create workout template'}</h2>
     <label>Name<input name="name" defaultValue={initial?.name} minLength={2} maxLength={150} required disabled={saving}/></label>
     <label>Description<textarea name="description" defaultValue={initial?.description} maxLength={2000} disabled={saving}/></label>

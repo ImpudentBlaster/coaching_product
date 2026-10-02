@@ -3,6 +3,8 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest';
 import { apiRequest } from '../../lib/api';
 import { ProgramAssignment } from './program-assignment';
+import { notify } from '../../lib/notify';
+vi.mock('../../lib/notify',()=>({notify:{success:vi.fn(),error:vi.fn()}}));
 vi.mock('../../lib/api', () => ({ apiRequest: vi.fn() }));
 afterEach(() => { cleanup(); vi.resetAllMocks(); vi.useRealTimers(); });
 it('debounces searches, checks assigned clients and immediately saves both toggle directions', async () => {
@@ -32,7 +34,7 @@ it('debounces searches, checks assigned clients and immediately saves both toggl
   vi.mocked(apiRequest).mockRejectedValueOnce(new Error('Unable to save'));
   await act(async()=>{fireEvent.click(checkbox);});
   expect(checkbox).toBeChecked();
-  expect(screen.getByText('Unable to save')).toBeInTheDocument();
+  expect(notify.error).toHaveBeenCalledWith('Unable to save');
   expect(onChanged).toHaveBeenCalledTimes(2);
 });
 it('ignores stale responses and refreshes checked state after an external removal', async()=>{

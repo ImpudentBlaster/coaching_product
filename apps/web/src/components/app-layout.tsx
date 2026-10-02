@@ -82,7 +82,7 @@ function Sidebar({ groups, name, role, onLogout }: { groups: NavGroup[]; name: s
         if (!group.icon) return group.items.map(item => renderLink(item));
         const submenuId = `sidebar-submenu-${index}`;
         return <section className="sidebar-group" key={group.label}>
-          <button type="button" className={`sidebar-link sidebar-group-toggle${group.items.some(current) ? ' active' : ''}`}
+          <button type="button" className="sidebar-link sidebar-group-toggle"
             aria-label={group.label} title={group.label} aria-expanded={expanded} aria-controls={submenuId}
             onClick={() => {
               if (!expanded) setKeyboardFocus(true);

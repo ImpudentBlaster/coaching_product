@@ -25,6 +25,8 @@ it('collapses to five destinations and opens every submenu when the sidebar expa
   for (const button of nav.getAllByRole('button')) expect(button).toHaveAttribute('aria-expanded', 'true');
   for (const name of ['Clients', 'Foods', 'Workouts', 'Settings']) expect(nav.getByRole('link', { name })).toBeInTheDocument();
   expect(nav.getByRole('link', { name: 'Workouts' })).toHaveAttribute('aria-current', 'page');
+  expect(nav.getByRole('link', { name: 'Workouts' })).toHaveClass('active');
+  expect(nav.getByRole('button', { name: 'Training' })).not.toHaveClass('active');
   fireEvent.pointerLeave(sidebar);
   expect(nav.queryByRole('link', { name: 'Workouts' })).not.toBeInTheDocument();
   expect(nav.getAllByRole('link')).toHaveLength(1);
@@ -41,6 +43,8 @@ it('keeps all submenus open while hovering, clicking categories and navigating',
   expect(nav.getByRole('button', { name: 'Nutrition' })).toHaveAttribute('aria-expanded', 'true');
   fireEvent.click(nav.getByRole('link', { name: 'Foods' }));
   expect(nav.getByRole('link', { name: 'Foods' })).toHaveAttribute('aria-current', 'page');
+  expect(nav.getByRole('link', { name: 'Foods' })).toHaveClass('active');
+  expect(nav.getByRole('button', { name: 'Nutrition' })).not.toHaveClass('active');
   fireEvent.pointerEnter(nav.getByRole('button', { name: 'Coaching' }));
   fireEvent.click(nav.getByRole('button', { name: 'Coaching' }));
   expect(nav.getByRole('link', { name: 'Foods' })).toBeInTheDocument();

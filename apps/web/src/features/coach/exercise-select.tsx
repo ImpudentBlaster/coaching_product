@@ -56,7 +56,7 @@ export function ExerciseSelect({ name, index, exercises, initialId = '', initial
         {items.map((exercise, optionIndex) => <button type="button" role="option" tabIndex={-1} id={`${id}-option-${optionIndex}`} key={exercise.id}
           aria-selected={selected.id === exercise.id} className={activeIndex === optionIndex ? 'highlighted' : ''}
           onMouseDown={event => event.preventDefault()} onClick={() => choose(exercise)}>
-          <strong>{exercise.name}</strong><small>{exercise.target}{exercise.custom ? ' · Your exercise' : ''}</small>
+          <span className="exercise-option-preview" aria-hidden="true"><ExerciseGif id={exercise.id} name={exercise.name} available={exercise.gifAvailable ?? true} /></span><span className="exercise-option-text"><strong>{exercise.name}</strong><small>{exercise.target}{exercise.custom ? ' · Your exercise' : ''}</small></span>
         </button>)}
       </div>
       {loading && <p role="status">Searching exercises…</p>}

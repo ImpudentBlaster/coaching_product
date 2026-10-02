@@ -64,7 +64,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
       await admin.query(`CREATE SCHEMA ${schema}`);
       for (const file of [
         '001_identity_approvals.sql',
-        '002_demo_mvp.sql',
+        '002_demo_mvp.sql', '009_custom_exercises.sql', '010_program_exercise_days.sql',
         '003_nutrition_library.sql',
  '006_library_management.sql',
       ]) {
@@ -180,6 +180,31 @@ describe.skipIf(!process.env.DATABASE_URL)(
       await pool.query("UPDATE programs SET status='ARCHIVED' WHERE id=$1", [programId]);
       expect((await request(app).put(`/coach/programs/${programId}`).set('Authorization', coachToken).send(body)).status).toBe(409);
     });
+    it('saves manual program days atomically, enforces exercise ownership and snapshots instructions', async () => {
+      const externalId = `manual-${randomUUID()}`;
+      const privateId = `private-${randomUUID()}`;
+      await pool.query('INSERT INTO exercises(external_id,name,body_part,equipment,target,instructions) VALUES($1,$2,$3,$4,$5,$6)', [externalId, 'Manual squat', 'legs', 'body weight', 'quads', JSON.stringify(['Lower slowly.'])]);
+      await pool.query('INSERT INTO exercises(external_id,name,body_part,equipment,target,instructions,owner_coach_id) VALUES($1,$2,$3,$4,$5,$6,$7)', [privateId, 'Private exercise', 'legs', 'body weight', 'quads', '[]', otherCoach]);
+      const body = { name: 'Manual program', description: '', days: [{ dayLabel: 'Day 1', exercises: [{ exerciseId: externalId, sets: 3, repetitions: 10, restSeconds: 60 }] }] };
+      expect((await request(app).post('/coach/programs').set('Authorization', coachToken).send({ ...body, days: [{ ...body.days[0], exercises: [{ ...body.days[0]!.exercises[0], exerciseId: privateId }] }] })).status).toBe(409);
+      await pool.query("ALTER TABLE audit_events ADD CONSTRAINT fail_manual_program CHECK(action <> 'PROGRAM_CREATED') NOT VALID");
+      try {
+        expect((await request(app).post('/coach/programs').set('Authorization', coachToken).send(body)).status).toBe(409);
+        expect((await pool.query("SELECT id FROM workout_templates WHERE program_day_only AND name='Day 1'")).rowCount).toBe(0);
+      } finally { await pool.query('ALTER TABLE audit_events DROP CONSTRAINT fail_manual_program'); }
+      const created = await request(app).post('/coach/programs').set('Authorization', coachToken).send(body);
+      expect(created.status).toBe(201);
+      const programId = (created.body as { program: { id: string } }).program.id;
+      const listed = await request(app).get('/coach/programs').set('Authorization', coachToken);
+      expect((listed.body as { programs: Array<{ id: string; days: Array<{ manual: boolean }> }> }).programs.find(item => item.id === programId)?.days[0]?.manual).toBe(true);
+      expect((await request(app).post(`/coach/programs/${programId}/publish`).set('Authorization', coachToken)).status).toBe(200);
+      expect((await request(app).post(`/coach/programs/${programId}/assign`).set('Authorization', coachToken).send({ clientId: client })).status).toBe(201);
+      const snapshot = (await pool.query<{ snapshot: { days: Array<{ exercises: Array<{ instructions: string[] }> }> } }>('SELECT snapshot FROM program_assignments WHERE program_id=$1', [programId])).rows[0]!.snapshot;
+      expect(snapshot.days[0]!.exercises[0]!.instructions).toEqual(['Lower slowly.']);
+      expect((await request(app).put(`/coach/programs/${programId}`).set('Authorization', coachToken).send(body)).status).toBe(200);
+      expect((await pool.query('SELECT id FROM workout_templates WHERE coach_id=$1 AND program_day_only', [coach])).rowCount).toBe(1);
+      expect((await pool.query<{ snapshot: unknown }>('SELECT snapshot FROM program_assignments WHERE program_id=$1', [programId])).rows[0]!.snapshot).toEqual(snapshot);
+    });
     it('archives programs only for their owner and rolls back when auditing fails',async()=>{
       const programId=randomUUID();
       await pool.query("INSERT INTO programs(id,coach_id,name,description) VALUES($1,$2,'Test program','')",[programId,coach]);
@@ -260,14 +285,53 @@ describe.skipIf(!process.env.DATABASE_URL)(
         ],
       });
       expect(day.data.nutrients?.calories).toBe(600);
+      const mixedDay = await create('days', {
+        name: 'Mixed day',
+        items: [{id:meal.id,label:'Breakfast'},{id:food.id,type:'foods',quantity:50,label:'Snack'}],
+      });
+      expect(mixedDay.data.nutrients).toEqual({calories:500,protein:12.5,carbs:87.5,fat:10});
+      expect(mixedDay.data.items?.[1]).toMatchObject({label:'Snack',quantity:50,node:{kind:'foods',name:'Oats'},nutrients:{calories:200,protein:5,carbs:35,fat:4}});
+      const foodDay = await create('days',{name:'Food only day',items:[{id:food.id,type:'foods',quantity:25,label:'Lunch'}]});
+      expect(foodDay.data.nutrients?.calories).toBe(100);
+      const customId=randomUUID();
+      const entryDay=await create('days',{name:'Named entries day',items:[{id:meal.id,label:'Morning'},{id:customId,type:'custom',label:'Lunch',foods:[{id:food.id,quantity:50},{id:food.id,quantity:25}]}]});
+      expect(entryDay.data.nutrients).toEqual({calories:600,protein:15,carbs:105,fat:12});
+      expect(entryDay.data.items?.[1]).toMatchObject({id:customId,label:'Lunch',node:{kind:'meals',custom:true,name:'Lunch',items:[{id:food.id,quantity:50},{id:food.id,quantity:25}]}});
+      const updatedDay=await request(app).put(`/coach/nutrition-library/days/${entryDay.id}`).set('Authorization',coachToken).send({name:'Named entries day',version:1,items:[{id:customId,type:'custom',label:'Dinner',foods:[{id:food.id,quantity:100}]}]});
+      expect(updatedDay.status).toBe(200);
+      const updatedNode=(updatedDay.body as {entry:{data:NutritionNode}}).entry.data;
+      expect(updatedNode.items?.[0]?.node.name).toBe('Dinner');
+      expect(updatedNode.nutrients?.calories).toBe(400);
+      for (const item of [
+        {id:foreign.id,type:'foods',quantity:1,label:'Private'},
+        {id:meal.id,type:'foods',quantity:1,label:'Wrong kind'},
+        {id:food.id,label:'Wrong kind'},
+        {id:food.id,type:'foods',quantity:0,label:'Invalid quantity'},
+        {id:food.id,type:'foods',label:'Missing quantity'},
+        {id:customId,type:'custom',label:'Empty',foods:[]},
+        {id:customId,type:'custom',label:'Private',foods:[{id:foreign.id,quantity:1}]},
+        {id:customId,type:'custom',label:'Wrong kind',foods:[{id:meal.id,quantity:1}]},
+        {id:customId,type:'custom',label:'Bad portion',foods:[{id:food.id,quantity:0}]},
+      ]) {
+        expect((await request(app).post('/coach/nutrition-library/days').set('Authorization',coachToken).send({name:'Invalid day',items:[item]})).status).toBe(400);
+      }
+      const customPlanDay={id:randomUUID(),type:'custom',label:'Rest day',notes:'Recover well',items:[{id:meal.id,label:'Breakfast'},{id:randomUUID(),type:'custom',label:'Lunch',foods:[{id:food.id,quantity:50}]}]};
+      for(const items of [
+        [],
+        [{id:randomUUID(),type:'custom',label:'Lunch',foods:[{id:foreign.id,quantity:50}]}],
+        [{id:randomUUID(),type:'custom',label:'Lunch',foods:[{id:meal.id,quantity:50}]}],
+        [{id:randomUUID(),type:'custom',label:'Lunch',foods:[{id:food.id,quantity:0}]}],
+      ])expect((await request(app).post('/coach/nutrition-library/plans').set('Authorization',coachToken).send({name:'Invalid custom plan',items:[{...customPlanDay,items}]})).status).toBe(400);
       const plan = await create('plans', {
         name: 'Weekly plan',
         items: [
           { id: day.id, label: 'Day 1' },
-          { id: day.id, label: 'Day 2' },
+          customPlanDay,
         ],
       });
       expect(plan.data.nutrients).toBeUndefined();
+      expect(plan.data.items?.[1]?.node).toMatchObject({kind:'days',custom:true,name:'Rest day',notes:'Recover well',nutrients:{calories:500,protein:12.5,carbs:87.5,fat:10},items:[{label:'Breakfast',node:{kind:'meals'}},{label:'Lunch',node:{kind:'meals',custom:true,items:[{quantity:50,node:{name:'Oats'}}]}}]});
+      expect((await pool.query('SELECT id FROM nutrition_library WHERE id=$1',[customPlanDay.id])).rowCount).toBe(0);
       expect((await request(app).get('/coach/nutrition-library')).status).toBe(
         401,
       );
@@ -331,7 +395,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
           )
         ).rowCount,
       ).toBe(2);
-      const changed={name:'Updated plan',items:plan.data.items!.map(item=>({id:item.id,label:item.label})),version:1};
+      const changed={name:'Updated plan',items:[{id:day.id,label:'Day 1'},customPlanDay],version:1};
       expect((await request(app).put(`/coach/nutrition-library/plans/${plan.id}`).set('Authorization',token(otherCoach,'COACH')).send(changed)).status).toBe(400);
       expect((await request(app).put(`/coach/nutrition-library/plans/${plan.id}`).set('Authorization',coachToken).send(changed)).status).toBe(200);
       expect((await request(app).put(`/coach/nutrition-library/plans/${plan.id}`).set('Authorization',coachToken).send(changed)).status).toBe(400);

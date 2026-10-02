@@ -49,18 +49,23 @@ export function ProgramRow({ program, templates, onEdit, onSaved, onMessage, onA
       { label: 'Delete', danger: true, onSelect: () => { setError(''); setPanel('delete'); } },
       { label: 'Assign', onSelect: () => { setError(''); setPanel('assign'); } },
     ]}/></td>
-    <td className="workout-view-cell"><button type="button" className="secondary workout-icon-action" aria-label={`View ${program.name}`} title="View program" disabled={disabled || busy} onClick={() => { setError(''); setPanel('view'); }}><Icon kind="view"/></button></td>
-    {(panel === 'view' || panel === 'assign') && <EditorDialog title={panel === 'assign' ? 'Assign program' : 'Program details'} variant="drawer" busy={busy} onClose={() => setPanel(null)}>
-      <div className="workout-details"><div className="workout-details-heading"><div><h3>{program.name}</h3><p>{program.days.length} workout days · {program.status.toLowerCase()}</p></div><button type="button" className="secondary" disabled={busy} onClick={() => { setPanel(null); onEdit(); }}>Edit program</button></div>
-        <p className="workout-description">{program.description || 'No description added.'}</p>
+    <td className="workout-view-cell"><button type="button" className="secondary icon-button workout-icon-action" aria-label={`View ${program.name}`} title="View program" disabled={disabled || busy} onClick={() => { setError(''); setPanel('view'); }}><Icon kind="view"/></button></td>
+    {(panel === 'view' || panel === 'assign') && <EditorDialog title="Program details" variant="drawer" busy={busy} onClose={() => setPanel(null)} headerContent={<div className="workout-details-heading"><div><h3>{program.name}</h3><p className="detail-metadata"><span className={`status ${program.status.toLowerCase()}`}>{program.status.toLowerCase()}</span><span aria-hidden="true">·</span><span>{program.days.length} workout {program.days.length === 1 ? 'day' : 'days'}</span></p></div><button type="button" className="primary" disabled={busy} onClick={() => { setPanel(null); onEdit(); }}>Edit program</button></div>}>
+      <div className="workout-details detail-view">
+        <section className="detail-section" aria-label="Program information"><h4 className="detail-section-title">Program information</h4><p className="workout-description">{program.description || 'No description added.'}</p></section>
+        <section className="detail-section" aria-label="Workout schedule"><h4 className="detail-section-title">Workout schedule</h4>
         <ol className="workout-detail-exercises program-workout-list">{[...program.days].sort((a,b) => a.position-b.position).map((day,index) => <ProgramWorkoutDetails key={`${day.templateId}-${index}`} day={day} index={index} workout={templates.find(template => template.id === day.templateId)}/>)}</ol>
         {!program.days.length && <p>No workouts added yet.</p>}
-        <Notice message={error} error onClear={() => setError('')}/>
+        </section>
+        <Notice transient message={error} error onClear={() => setError('')}/>
+        <section className="detail-section detail-assignment" aria-label="Client assignment"><h4 className="detail-section-title">Assign to clients</h4>
         {panel === 'assign' && program.status === 'DRAFT' && <p>Publish this program before assigning it to a client.</p>}
-        {program.status === 'DRAFT' && <button type="button" className="primary" disabled={busy || !program.days.length} onClick={() => void act('publish')}>{busy ? 'Publishing…' : 'Publish program'}</button>}
+        {program.status === 'DRAFT' && <button type="button" className="primary program-publish-action" disabled={busy || !program.days.length} onClick={() => void act('publish')}>{busy ? 'Publishing…' : 'Publish program'}</button>}
         {program.status === 'PUBLISHED' && <><ProgramAssignment programId={program.id} busy={busy} onBusy={setBusy} revision={assignmentRevision} onChanged={assignmentsChanged}/><AssignedProgramClients programId={program.id} busy={busy} onBusy={setBusy} externalRevision={assignmentRevision} onChanged={assignmentsChanged}/></>}
+        {program.status === 'DRAFT' && panel !== 'assign' && <p className="detail-empty">Publish this program to make it available for client assignment.</p>}
+        </section>
       </div>
     </EditorDialog>}
-    {panel === 'delete' && <EditorDialog title="Delete program?" variant="confirmation" busy={busy} onClose={() => setPanel(null)}><p>Delete <strong>{program.name}</strong> from your program library? Existing client assignments will be preserved.</p><Notice message={error} error onClear={() => setError('')}/><div className="workout-confirm-actions"><button type="button" className="secondary" disabled={busy} onClick={() => setPanel(null)}>Cancel</button><button type="button" className="danger" disabled={busy} onClick={() => void act('delete')}>{busy ? 'Deleting…' : 'Delete program'}</button></div></EditorDialog>}
+    {panel === 'delete' && <EditorDialog title="Delete program?" variant="confirmation" busy={busy} onClose={() => setPanel(null)}><p>Delete <strong>{program.name}</strong> from your program library? Existing client assignments will be preserved.</p><Notice transient message={error} error onClear={() => setError('')}/><div className="workout-confirm-actions"><button type="button" className="secondary" disabled={busy} onClick={() => setPanel(null)}>Cancel</button><button type="button" className="danger" disabled={busy} onClick={() => void act('delete')}>{busy ? 'Deleting…' : 'Delete program'}</button></div></EditorDialog>}
   </tr>;
 }
