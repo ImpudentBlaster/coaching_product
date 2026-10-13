@@ -9,6 +9,22 @@ vi.mock('../../lib/api',()=>({apiRequest:vi.fn()}));
 HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
 HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
 afterEach(()=>{cleanup();vi.resetAllMocks();notify.dismiss();});
+it('edits an assigned supplement plan and applies its updated snapshot to this client',async()=>{
+  const entry={id:'current',version:3,data:{kind:'supplements',name:'Daily supplements',notes:'',supplements:[{name:'Example',timing:'Breakfast',dosage:'Original dose',link:''}]}};
+  vi.mocked(apiRequest).mockImplementation(async(_path,init)=>init?.method==='PUT'?{entry}:{entries:[entry]});
+  const assigned=vi.fn().mockResolvedValue(undefined);
+  render(<MemoryRouter><ClientPlanDialog kind="supplements" create={false} edit currentPlan={{id:'current',name:'Daily supplements'}} clientId="client" clientName="Taylor" onClose={vi.fn()} onAssigned={assigned}/></MemoryRouter>);
+  const dosage=await screen.findByLabelText('Dosage');
+  expect(dosage).toHaveValue('Original dose');
+  fireEvent.change(dosage,{target:{value:'Updated dose'}});
+  fireEvent.click(screen.getByRole('button',{name:'Save supplement plan'}));
+  const apply=await screen.findByRole('button',{name:'Apply changes'});
+  await waitFor(()=>expect(apply).toBeEnabled());
+  fireEvent.click(apply);
+  await waitFor(()=>expect(assigned).toHaveBeenCalledOnce());
+  expect(apiRequest).toHaveBeenCalledWith('/coach/nutrition-library/supplements/current',expect.objectContaining({method:'PUT',body:expect.stringContaining('"version":3')}));
+  expect(apiRequest).toHaveBeenCalledWith('/coach/nutrition-library/supplements/current/assign',{method:'POST',body:JSON.stringify({clientId:'client'})});
+});
 it('preselects the current plan and requires a different selection before reassignment',async()=>{
   vi.mocked(apiRequest).mockResolvedValue({entries:[{id:'current',data:{kind:'plans',name:'Starter plan'}},{id:'other',data:{kind:'plans',name:'Next plan'}}]});
   render(<MemoryRouter><ClientPlanDialog kind="nutrition" create={false} currentPlan={{id:'current',name:'Starter plan'}} clientId="client" clientName="Taylor" onClose={vi.fn()} onAssigned={vi.fn()}/></MemoryRouter>);

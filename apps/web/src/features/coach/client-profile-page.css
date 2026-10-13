@@ -69,4 +69,14 @@
 .client-plan-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
 .client-plan-heading h2 { margin: 0; }
 .client-plan-actions { flex-wrap: wrap; }
+.client-plan-heading { padding-bottom: 1.25rem; border-bottom: 1px solid #e1e9e4; align-items: center; }
+.client-plan-heading h2 { font-size: 1.1rem; font-weight: 750; }
+.coach-client-profile .client-plan-actions .icon-button { width: 44px; height: 44px; min-height: 44px; padding: 11px; border: 0; border-radius: 12px; flex: 0 0 44px; }
+.coach-client-profile .client-plan-actions .icon-button svg { width: 22px; height: 22px; }
+.coach-client-profile .client-plan-actions .client-plan-edit { background: #edf5ff; color: #2780ed; }
+.coach-client-profile .client-plan-actions .client-plan-delete { background: #fff0f3; color: #ed3e61; }
+.coach-client-profile .client-plan-actions .client-plan-edit:hover { background: #dcecff; }
+.coach-client-profile .client-plan-actions .client-plan-delete:hover { background: #ffe0e8; }
+.client-supplement-plan .supplement-plan-title { display: none; }
+.client-assigned-plan-title { margin: 0 0 1rem; font-size: 1.15rem; }
 @media (max-width: 600px) { .client-plan-actions { width: 100%; } .client-plan-actions button { flex: 1 1 auto; } }

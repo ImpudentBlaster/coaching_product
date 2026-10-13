@@ -34,6 +34,29 @@ describe.skipIf(!process.env.DATABASE_URL)('coach client profile',()=>{
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({profile:{client:{id:client,displayName:'Profile client'},onboarding:{data:{weight:72}},program:null,nutrition:null,workouts:[],progress:[{measurement_date:'2026-09-20',notes:'Recorded progress'}],checkins:[{status:'PENDING',form:{name:'Daily review'}}],subscription:{plan_name:'Monthly coaching'}}});
   });
+  it('removes only owned client assignments and rolls back removal when auditing fails',async()=>{
+    await pool.query("INSERT INTO coach_profiles(user_id,display_name,business_name) VALUES($1,'Coach','Business')",[coach]);
+    for(const kind of ['program','nutrition','supplements'] as const){
+      const planId=randomUUID();
+      const table=kind==='program'?'program_assignments':kind==='nutrition'?'nutrition_plan_assignments':'supplement_plan_assignments';
+      const column=kind==='program'?'program_id':'plan_id';
+      if(kind==='program')await pool.query("INSERT INTO programs(id,coach_id,name) VALUES($1,$2,'Assigned program')",[planId,coach]);
+      else await pool.query('INSERT INTO nutrition_library(id,coach_id,kind,data) VALUES($1,$2,$3,$4)',[planId,coach,kind==='nutrition'?'plans':'supplements',JSON.stringify({name:'Assigned plan'})]);
+      await pool.query(`INSERT INTO ${table}(coach_id,client_id,${column},snapshot) VALUES($1,$2,$3,'{}')`,[coach,client,planId]);
+      const path=`/coach/clients/${client}/profile/plans/${kind}/${planId}`;
+      expect((await request(app).delete(path).set('Authorization',token(other,'COACH'))).status).toBe(404);
+      expect((await request(app).delete(path).set('Authorization',token(client,'CLIENT'))).status).toBe(403);
+      await pool.query("ALTER TABLE audit_events ADD CONSTRAINT fail_assignment_remove CHECK(entity_type <> 'CLIENT_PLAN_ASSIGNMENT') NOT VALID");
+      try{
+        expect((await request(app).delete(path).set('Authorization',token(coach,'COACH'))).status).toBe(500);
+        expect((await pool.query(`SELECT id FROM ${table} WHERE ${column}=$1 AND active`,[planId])).rowCount).toBe(1);
+      }finally{await pool.query('ALTER TABLE audit_events DROP CONSTRAINT fail_assignment_remove');}
+      expect((await request(app).delete(path).set('Authorization',token(coach,'COACH'))).status).toBe(204);
+      expect((await pool.query(`SELECT id FROM ${table} WHERE ${column}=$1 AND NOT active`,[planId])).rowCount).toBe(1);
+      expect((await pool.query('SELECT id FROM '+(kind==='program'?'programs':'nutrition_library')+' WHERE id=$1',[planId])).rowCount).toBe(1);
+      expect((await request(app).delete(path).set('Authorization',token(coach,'COACH'))).status).toBe(409);
+    }
+  });
   it('denies unknown, cross-coach, wrong-role and revoked access',async()=>{
     const path=`/coach/clients/${client}/profile`;
     expect((await request(app).get(path)).status).toBe(401);
