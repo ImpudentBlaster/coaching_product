@@ -1,0 +1,72 @@
+.coach-client-profile { min-width: 0; }
+.coach-client-profile .profile-topbar { gap: var(--space-4); margin-bottom: var(--space-5); flex-wrap: wrap; }
+.coach-client-profile .client-profile-header { gap: var(--space-6); padding: var(--space-6) var(--space-6) 0; }
+.coach-client-profile .client-profile-stats { align-items: stretch; grid-auto-rows: 1fr; }
+.coach-client-profile .client-profile-stats > div { background: var(--color-surface-subtle); border-color: var(--color-border); padding: var(--space-4); display: flex; flex-direction: column; }
+.coach-client-profile .client-profile-stats dt { font-size: var(--font-helper); color: var(--color-muted); }
+.coach-client-profile .client-profile-stats dd { font-size: var(--font-body); font-weight: var(--weight-heading); line-height: 1.5; }
+.coach-client-profile .client-profile-stats small { margin-top: var(--space-1); }
+.coach-client-profile .status { display: inline-flex; align-items: center; width: fit-content; white-space: nowrap; }
+.coach-client-profile .client-profile-content { gap: var(--space-5); }
+.coach-client-profile .client-profile-grid { align-items: stretch; gap: var(--space-5); }
+.coach-client-profile .plan-summary, .coach-client-profile .profile-questionnaire { padding: var(--space-6); min-width: 0; }
+.coach-client-profile .plan-summary > h2, .coach-client-profile .onboarding-review > h2 { margin: 0 0 var(--space-5); font-size: var(--font-section); line-height: 1.35; }
+.coach-client-profile .client-profile-grid > section { display: flex; flex-direction: column; }
+.coach-client-profile .client-profile-grid > section > a:last-child { align-self: flex-start; margin-top: auto; display: inline-flex; align-items: center; justify-content: center; }
+.coach-client-profile .client-profile-grid > section > :nth-last-child(2) { margin-bottom: var(--space-5); }
+.coach-client-profile .profile-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin: 0 0 var(--space-5); }
+.coach-client-profile .profile-facts > div { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-subtle); }
+.coach-client-profile .profile-facts dt { font-size: var(--font-helper); color: var(--color-muted); }
+.coach-client-profile .profile-facts dd { font-size: var(--font-body); font-weight: var(--weight-label); line-height: 1.5; margin: 0; }
+.coach-client-profile .profile-record { padding: var(--space-4); margin: 0 0 var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-subtle); }
+.coach-client-profile .profile-record > strong { font-size: var(--font-body); line-height: 1.5; }
+.coach-client-profile .profile-record > h3 { font-size: 1rem; margin: 0 0 var(--space-3); }
+.coach-client-profile .profile-record p { margin: var(--space-2) 0 0; font-size: var(--font-body); line-height: 1.6; color: var(--color-muted); }
+.coach-client-profile .profile-record:last-of-type { margin-bottom: var(--space-5); }
+.coach-client-profile .onboarding-review > section { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid var(--color-border); }
+.coach-client-profile .onboarding-review > section > h3 { margin: 0 0 var(--space-4); font-size: var(--font-helper); font-weight: var(--weight-heading); letter-spacing: .06em; text-transform: uppercase; color: var(--color-muted); }
+.coach-client-profile .onboarding-review > section > dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin: 0; align-items: stretch; }
+.coach-client-profile .onboarding-review .onboarding-answer { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: var(--space-4); min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-subtle); }
+.coach-client-profile .onboarding-answer dt { font-size: var(--font-helper); color: var(--color-muted); line-height: 1.5; }
+.coach-client-profile .onboarding-answer dd { margin: 0; font-size: var(--font-body); line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
+.coach-client-profile .onboarding-review > button:last-child { margin-top: var(--space-5); }
+.coach-client-profile .onboarding-timestamps { display: grid; gap: var(--space-2); margin: var(--space-4) 0 0; }
+.coach-client-profile .onboarding-timestamps > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: var(--space-4); align-items: baseline; }
+.coach-client-profile .onboarding-timestamps dt { font-size: var(--font-helper); color: var(--color-muted); }
+.coach-client-profile .onboarding-timestamps dd { margin: 0; font-size: var(--font-body); line-height: 1.5; }
+.coach-client-profile .client-plan-details { min-width: 0; }
+.client-workout-schedule { padding: 0; margin: 0; list-style: none; display: grid; gap: var(--space-3); }
+.client-workout-details { border: 1px solid var(--color-border); border-radius: var(--radius-card); overflow: hidden; }
+.client-workout-details > summary { list-style: none; display: grid; grid-template-columns: 34px minmax(0, 1fr) 12px; align-items: center; gap: var(--space-3); padding: var(--space-4); cursor: pointer; background: var(--color-surface-subtle); }
+.client-workout-details > summary::-webkit-details-marker { display: none; }
+.client-workout-details > summary::after { content: ''; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); }
+.client-workout-details[open] > summary { background: #edf5ef; }
+.client-workout-details[open] > summary::after { transform: rotate(225deg); }
+.coach-client-profile .client-plan-details .workout-detail-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); margin: var(--space-3) 0 0 80px; }
+@media (max-width: 650px) {
+  .coach-client-profile .client-plan-details .workout-detail-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-left: 0; }
+}
+.coach-client-profile .profile-membership-notes { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--font-body); line-height: 1.6; }
+.coach-client-profile .profile-muted { font-size: var(--font-helper); line-height: 1.6; color: var(--color-muted); }
+.coach-client-profile .profile-table-scroll table { min-width: 680px; }
+.coach-client-profile .profile-table-scroll th { background: var(--color-surface-subtle); color: var(--color-muted); white-space: nowrap; }
+.coach-client-profile .profile-table-scroll th, .coach-client-profile .profile-table-scroll td { text-align: left; vertical-align: middle; padding: var(--space-3) var(--space-4); }
+.profile-training-exercises { display: grid; gap: var(--space-3); }
+.profile-training-exercise { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-control); padding: var(--space-4); min-width: 0; }
+.profile-training-exercise > strong { font-size: var(--font-body); }
+.profile-training-exercise dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin: var(--space-3) 0 0; }
+.profile-training-exercise dt { font-size: var(--font-helper); color: var(--color-muted); }
+.profile-training-exercise dd { margin: var(--space-1) 0 0; font-size: var(--font-body); }
+@media (max-width: 650px) {
+  .coach-client-profile .client-profile-header { padding: var(--space-4) var(--space-4) 0; }
+  .coach-client-profile .plan-summary, .coach-client-profile .profile-questionnaire { padding: var(--space-4); }
+  .coach-client-profile .profile-facts, .coach-client-profile .onboarding-review > section > dl { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 400px) {
+  .coach-client-profile .client-profile-stats { grid-template-columns: minmax(0, 1fr); }
+  .coach-client-profile .client-profile-identity { flex-wrap: wrap; }
+}
+.client-plan-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+.client-plan-heading h2 { margin: 0; }
+.client-plan-actions { flex-wrap: wrap; }
+@media (max-width: 600px) { .client-plan-actions { width: 100%; } .client-plan-actions button { flex: 1 1 auto; } }

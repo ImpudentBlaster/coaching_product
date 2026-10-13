@@ -12,16 +12,17 @@ const foodRef = z.object({ id: z.string().uuid(), quantity: z.number().finite().
 const dayItem = z.union([ref.extend({type:z.literal('meals').optional()}),ref.extend({type:z.literal('foods'),quantity:z.number().finite().min(0.01).max(10000)}),ref.extend({type:z.literal('custom'),foods:z.array(foodRef).min(1).max(30)})]);
 const planItem = z.union([ref.extend({type:z.literal('days').optional()}),ref.extend({type:z.literal('custom'),notes:base.notes,items:z.array(dayItem).min(1).max(12)})]);
 export const nutritionInput = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('supplements'), ...base, supplements: z.array(z.object({ name: z.string().trim().min(1).max(150), timing: z.string().trim().min(1).max(200), dosage: z.string().trim().min(1).max(200), link: z.union([z.literal(''), z.url().refine(value => /^https?:\/\//i.test(value))]).default('') })).min(1).max(50) }),
   z.object({ kind: z.literal('foods'), ...base, servingSize: z.number().finite().min(0.01).max(10000), unit: z.enum(['g', 'ml', 'piece']), nutrients: nutrientsSchema }),
   z.object({ kind: z.literal('meals'), ...base, items: z.array(z.object({ id: z.string().uuid(), quantity: z.number().finite().min(0.01).max(10000) })).min(1).max(30) }),
   z.object({ kind: z.literal('days'), ...base, items: z.array(dayItem).min(1).max(12) }),
   z.object({ kind: z.literal('plans'), ...base, items: z.array(planItem).min(1).max(31) }),
 ]);
 type Kind = z.infer<typeof nutritionInput>['kind'];
-export type NutritionNode = { name: string; notes: string; kind: Kind; custom?: boolean; nutrients?: Nutrients; servingSize?: number; unit?: string; items?: Array<{ id: string; label?: string; quantity?: number; node: NutritionNode; nutrients?: Nutrients }> };
+export type NutritionNode = { name: string; notes: string; kind: Kind; supplements?: Array<{name:string;timing:string;dosage:string;link:string}>; custom?: boolean; nutrients?: Nutrients; servingSize?: number; unit?: string; items?: Array<{ id: string; label?: string; quantity?: number; node: NutritionNode; nutrients?: Nutrients }> };
 type Entry = { id: string; data: NutritionNode; createdAt: string; updatedAt:string; version:number };
 class NutritionError extends Error {}
-const kinds = z.enum(['foods', 'meals', 'days', 'plans']);
+const kinds = z.enum(['foods', 'meals', 'days', 'plans', 'supplements']);
 
 export function sumNutrients(values: Nutrients[]): Nutrients {
   return values.reduce((total, value) => ({ calories: total.calories + value.calories, protein: total.protein + value.protein, carbs: total.carbs + value.carbs, fat: total.fat + value.fat }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
@@ -45,7 +46,8 @@ export function createNutritionCoachRouter(pool: Pool): Router {
   router.get('/', async (request, response) => {
     const result = await pool.query<Entry>('SELECT id,data,version,created_at "createdAt",updated_at "updatedAt" FROM nutrition_library WHERE coach_id=$1 AND archived_at IS NULL ORDER BY updated_at DESC,id', [request.auth!.userId]);
     const assignments = await pool.query<{ id: string; clientId: string; planId: string; assignedAt: string }>('SELECT id,client_id "clientId",plan_id "planId",assigned_at "assignedAt" FROM nutrition_plan_assignments WHERE coach_id=$1 AND active=true', [request.auth!.userId]);
-    response.json({ entries: result.rows, assignments: assignments.rows });
+    const supplements = await pool.query('SELECT id,client_id "clientId",plan_id "planId" FROM supplement_plan_assignments WHERE coach_id=$1 AND active', [request.auth!.userId]);
+    response.json({ entries: result.rows, assignments: assignments.rows, supplementAssignments: supplements.rows });
   });
   router.get('/catalog', (request,response) => response.json({foods:foodCatalog.map(food=>({...food,libraryEntryId:foodCopyId(request.auth!.userId,food.id)}))}));
   router.post('/catalog/:id/add', async (request,response) => {
@@ -79,7 +81,8 @@ export function createNutritionCoachRouter(pool: Pool): Router {
     try {
       const entry = await transaction(pool, async client => {
         const node: NutritionNode = { kind: input.kind, name: input.name, notes: input.notes };
-        if (input.kind === 'foods') Object.assign(node, { servingSize: input.servingSize, unit: input.unit, nutrients: input.nutrients });
+        if (input.kind === 'supplements') node.supplements = input.supplements;
+        else if (input.kind === 'foods') Object.assign(node, { servingSize: input.servingSize, unit: input.unit, nutrients: input.nutrients });
         else {
           const dayIds=(item:z.infer<typeof dayItem>)=>'foods' in item?item.foods.map(food=>food.id):[item.id];
           const ids=input.items.flatMap(item=>'items' in item?item.items.flatMap(dayIds):'foods' in item?item.foods.map(food=>food.id):[item.id]);
@@ -162,6 +165,29 @@ export function createNutritionCoachRouter(pool: Pool): Router {
       throw error;
     }
   });
+  router.post('/supplements/:id/assign', async (request, response) => {
+    const parsed = z.object({ clientId: z.string().uuid() }).safeParse(request.body);
+    if (!parsed.success || !z.string().uuid().safeParse(request.params.id).success) return response.status(400).json({ message: 'Choose a valid client and plan.' });
+    try {
+      const assignment = await transaction(pool, async client => {
+        // Lock the client to serialize replacement across coaches, then lock the
+        // relationship so approval cannot be revoked during assignment.
+        const user = await client.query('SELECT id FROM users WHERE id=$1 AND role=\'CLIENT\' AND account_status=\'APPROVED\' FOR UPDATE', [parsed.data.clientId]);
+        const relationship = await client.query('SELECT id FROM coach_clients WHERE coach_id=$1 AND client_id=$2 AND status=\'APPROVED\' FOR UPDATE', [request.auth!.userId, parsed.data.clientId]);
+        if (!user.rowCount || !relationship.rowCount) throw new NutritionError('Approved client not found.');
+        const plan = await client.query<Entry>('SELECT id,data FROM nutrition_library WHERE id=$1 AND coach_id=$2 AND archived_at IS NULL AND kind=\'supplements\'', [request.params.id, request.auth!.userId]);
+        if (!plan.rows[0]) throw new NutritionError('Plan not found.');
+        await client.query('UPDATE supplement_plan_assignments SET active=false WHERE client_id=$1 AND active=true', [parsed.data.clientId]);
+        const result = await client.query<{ id: string }>('INSERT INTO supplement_plan_assignments(coach_id,client_id,plan_id,snapshot) VALUES($1,$2,$3,$4) RETURNING id', [request.auth!.userId, parsed.data.clientId, plan.rows[0].id, JSON.stringify(plan.rows[0].data)]);
+        await audit(client, request.auth!.userId, 'SUPPLEMENT_ASSIGNED', result.rows[0]!.id, { clientId: parsed.data.clientId, planId: plan.rows[0].id });
+        return result.rows[0];
+      });
+      return response.status(201).json({ assignment });
+    } catch (error) {
+      if (error instanceof NutritionError) return response.status(404).json({ message: error.message });
+      throw error;
+    }
+  });
   return router;
 }
 
@@ -169,7 +195,8 @@ export function createNutritionClientRouter(pool: Pool): Router {
   const router = Router();
   router.get('/', async (request, response) => {
     const result = await pool.query<{ id: string; snapshot: NutritionNode; assignedAt: string }>(`SELECT a.id,a.snapshot,a.assigned_at "assignedAt" FROM nutrition_plan_assignments a JOIN coach_clients cc ON cc.coach_id=a.coach_id AND cc.client_id=a.client_id JOIN users coach ON coach.id=a.coach_id WHERE a.client_id=$1 AND a.active=true AND cc.status='APPROVED' AND coach.account_status='APPROVED'`, [request.auth!.userId]);
-    response.json({ assignment: result.rows[0] ?? null });
+    const supplements = await pool.query<{id:string;snapshot:NutritionNode}>("SELECT a.id,a.snapshot FROM supplement_plan_assignments a JOIN coach_clients cc ON cc.coach_id=a.coach_id AND cc.client_id=a.client_id JOIN users coach ON coach.id=a.coach_id WHERE a.client_id=$1 AND a.active AND cc.status='APPROVED' AND coach.account_status='APPROVED'", [request.auth!.userId]);
+    response.json({ assignment: result.rows[0] ?? null, supplements: supplements.rows[0] ?? null });
   });
   return router;
 }

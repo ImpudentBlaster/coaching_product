@@ -1,4 +1,5 @@
 import { ClientProfilePage } from '../features/coach/client-profile-page';
+import { PackagesPage } from '../features/coach/packages-page';
 import { ClientOnboardingGate } from '../features/client/client-onboarding-gate';
 import { ClientOnboardingPage } from '../features/client/client-onboarding-page';
 import { Link, Navigate, createBrowserRouter } from 'react-router-dom';
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([{ path: '/', element: <AuthProvider><
   { path: 'coach/clients/:clientId', element: <ClientProfilePage /> },
   { path: 'coach/feed', element: <CommunityFeed /> },
   { path: 'coach/studio', element: <CoachMvpPage /> },
+  { path: 'coach/packages', element: <PackagesPage /> },
   { path: 'client', element: <ClientOnboardingGate />, children: [
     { index: true, element: <ClientDashboard /> },
     { path: 'onboarding', element: <ClientOnboardingPage /> },

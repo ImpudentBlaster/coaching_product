@@ -3,6 +3,7 @@ import { createCoachOverviewRouter } from './coach-overview.js';
 import { createClientOnboardingRouter, createCoachOnboardingRouter } from './onboarding.js';
 import { createProgramAssignmentRouter } from './program-assignment.js';
 import { createClientSetupRouter } from './client-setup.js';
+import { createPackagesRouter } from './packages.js';
 import { createCoachCheckins, createClientCheckins } from './checkins.js';
 import { createNutritionCoachRouter, createNutritionClientRouter } from './nutrition.js';
 import { Router, type NextFunction, type Response } from 'express';
@@ -22,13 +23,14 @@ const nutritionLog=z.object({logDate:date,calories:z.number().int().nonnegative(
 const progress=z.object({measurementDate:date,bodyWeight:optionalNumber,waist:optionalNumber,chest:optionalNumber,arm:optionalNumber,notes:z.string().max(4000)});
 const subscription=z.object({clientId:uuid,planName:z.string().trim().min(2).max(150),status:z.enum(['PENDING','ACTIVE','PAUSED','CANCELLED','EXPIRED']),startsOn:date,endsOrRenewsOn:date.nullable().optional(),amount:z.number().nonnegative().nullable().optional(),currency:z.string().length(3).nullable().optional(),notes:z.string().max(4000)});
 
-export function createMvpRouter(environment:Environment,pool:Pool):Router{const router=Router();const jwt=authenticate(environment);const auth=(request:AuthenticatedRequest,response:Response,next:NextFunction)=>jwt(request,response,()=>{void pool.query<{role:string;account_status:string}>('SELECT role,account_status FROM users WHERE id=$1',[request.auth?.userId]).then(result=>{const row=result.rows[0];if(!row||row.account_status!=='APPROVED'){response.status(403).json({code:'FORBIDDEN',message:'Approved account required'});return;}request.auth={userId:request.auth!.userId,role:row.role as 'PLATFORM_ADMIN'|'COACH'|'CLIENT',approvalStatus:'APPROVED'};next();}).catch(next);});
+export function createMvpRouter(environment:Environment,pool:Pool):Router{const router=Router();const jwt=authenticate(environment,pool);const auth=(request:AuthenticatedRequest,response:Response,next:NextFunction)=>jwt(request,response,()=>{void pool.query<{role:string;account_status:string}>('SELECT role,account_status FROM users WHERE id=$1',[request.auth?.userId]).then(result=>{const row=result.rows[0];if(!row||row.account_status!=='APPROVED'){response.status(403).json({code:'FORBIDDEN',message:'Approved account required'});return;}request.auth={userId:request.auth!.userId,role:row.role as 'PLATFORM_ADMIN'|'COACH'|'CLIENT',approvalStatus:'APPROVED'};next();}).catch(next);});
   const role=(expected:'COACH'|'CLIENT')=>(request:AuthenticatedRequest,response:Response,next:NextFunction)=>request.auth?.role===expected?next():response.status(403).json({code:'FORBIDDEN',message:'You do not have access to this resource'});
   router.use('/client/onboarding',auth,role('CLIENT'),createClientOnboardingRouter(pool));
   router.use('/coach/clients/:clientId/onboarding',auth,role('COACH'),createCoachOnboardingRouter(pool));
   router.use('/coach/clients/:clientId/profile',auth,role('COACH'),createClientProfileRouter(pool));
   router.use('/coach/dashboard',auth,role('COACH'),createCoachOverviewRouter(pool));
-  router.use('/coach/client-setup',auth,role('COACH'),createClientSetupRouter(pool));
+  router.use('/coach/client-setup',auth,role('COACH'),createClientSetupRouter(pool,environment));
+  router.use('/coach/packages',auth,role('COACH'),createPackagesRouter(pool));
   router.use('/coach/checkins',auth,role('COACH'),createCoachCheckins(pool));
   router.use('/client/checkins',auth,role('CLIENT'),createClientCheckins(pool));
   router.use('/coach/nutrition-library',auth,role('COACH'),createNutritionCoachRouter(pool));
@@ -43,7 +45,11 @@ export function createMvpRouter(environment:Environment,pool:Pool):Router{const 
   router.delete('/coach/programs/:id',auth,role('COACH'),async(request,response)=>{if(!uuid.safeParse(param(request,'id')).success)return response.status(400).json({message:'Invalid program'});const result=await tx(pool,async c=>{const row=(await c.query<{id:string}>("UPDATE programs SET status='ARCHIVED',updated_at=now() WHERE id=$1 AND coach_id=$2 AND status<>'ARCHIVED' RETURNING id",[param(request,'id'),request.auth!.userId])).rows[0];if(row)await c.query("INSERT INTO audit_events(actor_user_id,action,entity_type,entity_id) VALUES($1,'PROGRAM_ARCHIVED','PROGRAM',$2)",[request.auth!.userId,row.id]);return row;});return result?response.status(204).send():response.status(404).json({message:'Program not found'});});
   router.get('/coach/programs',auth,role('COACH'),async(request,response)=>response.json({programs:(await pool.query(`SELECT p.*,(SELECT count(DISTINCT pa.client_id)::int FROM program_assignments pa WHERE pa.program_id=p.id AND pa.coach_id=p.coach_id AND pa.active) AS client_count,COALESCE(json_agg(json_build_object('id',pd.id,'templateId',pd.template_id,'dayLabel',pd.day_label,'position',pd.position,'templateName',wt.name,'manual',wt.program_day_only) ORDER BY pd.position) FILTER(WHERE pd.id IS NOT NULL),'[]') days FROM programs p LEFT JOIN program_days pd ON pd.program_id=p.id LEFT JOIN workout_templates wt ON wt.id=pd.template_id WHERE p.coach_id=$1 GROUP BY p.id ORDER BY p.created_at DESC`,[request.auth!.userId])).rows}));
   router.post('/coach/programs',auth,role('COACH'),async(request,response)=>saveProgram(pool,request,response));router.put('/coach/programs/:id',auth,role('COACH'),async(request,response)=>saveProgram(pool,request,response,param(request,'id')));
-  router.post('/coach/programs/:id/publish',auth,role('COACH'),async(request,response)=>{const result=await tx(pool,async c=>(await c.query(`UPDATE programs SET status='PUBLISHED',published_at=now(),updated_at=now() WHERE id=$1 AND coach_id=$2 AND status='DRAFT' AND EXISTS(SELECT 1 FROM program_days WHERE program_id=$1) RETURNING *`,[param(request,'id'),request.auth!.userId])).rows[0]);return result?response.json({program:result}):response.status(409).json({code:'INVALID_PROGRAM',message:'Only a complete draft can be published'});});
+  router.post('/coach/programs/:id/publish',auth,role('COACH'),async(request,response)=>{const result=await tx(pool,async c=>{
+    const row=(await c.query<{id:string}>(`UPDATE programs SET status='PUBLISHED',published_at=now(),updated_at=now() WHERE id=$1 AND coach_id=$2 AND status='DRAFT' AND EXISTS(SELECT 1 FROM program_days WHERE program_id=$1) RETURNING *`,[param(request,'id'),request.auth!.userId])).rows[0];
+    if(row)await c.query("INSERT INTO audit_events(actor_user_id,action,entity_type,entity_id) VALUES($1,'PROGRAM_PUBLISHED','PROGRAM',$2)",[request.auth!.userId,row.id]);
+    return row;
+  });return result?response.json({program:result}):response.status(409).json({code:'INVALID_PROGRAM',message:'Only a complete draft can be published'});});
   router.use('/coach/programs',auth,role('COACH'),createProgramAssignmentRouter(pool));
 
   router.get('/client/program',auth,role('CLIENT'),async(request,response)=>{const result=await pool.query(`SELECT id,program_id "programId",snapshot,assigned_at "assignedAt" FROM program_assignments WHERE client_id=$1 AND active=true ORDER BY assigned_at DESC LIMIT 1`,[request.auth!.userId]);response.json({assignment:result.rows[0]??null});});

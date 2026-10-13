@@ -14,7 +14,7 @@ it('orders recorded values without mutating entries and labels the chart honestl
   const entries = [{ measurement_date: '2026-09-18', body_weight: '81' }, { measurement_date: '2026-09-01', body_weight: '80' }];
   render(<ProgressStory entries={entries} />);
   expect(screen.getByRole('img').getAttribute('aria-label')).toContain('from 80 to 81 kilograms');
-  expect(screen.getByText(/\+1 kg since 2026-09-01/)).toBeTruthy();
+  expect(screen.getByText(/\+1 kg since 01-09-2026/)).toBeTruthy();
   expect(entries[0]?.measurement_date).toBe('2026-09-18');
 });
 

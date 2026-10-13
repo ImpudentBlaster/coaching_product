@@ -17,6 +17,7 @@ vi.mock('./auth-context', () => ({ useAuth: () => ({ login, ready: true }) }));
 afterEach(() => {
   cleanup();
   vi.resetAllMocks();
+  window.location.hash = '';
 });
 
 const token = 'private-invitation-token-for-test';
@@ -38,6 +39,13 @@ function mockInvitation(displayName = 'Asha Shah') {
   });
   vi.mocked(apiRequest).mockResolvedValueOnce({ user: { email } });
 }
+it('reads registration codes from emailed fragment links', async () => {
+  window.location.hash = `invite=${token}`;
+  mockInvitation();
+  openInvite('');
+  await screen.findByText('Asha Shah');
+  expect(apiRequest).toHaveBeenCalledWith('/auth/client/invitation', { method: 'POST', body: JSON.stringify({ token }) });
+});
 async function submitPassword() {
   fireEvent.change(await screen.findByLabelText('Password'), {
     target: { value: password },

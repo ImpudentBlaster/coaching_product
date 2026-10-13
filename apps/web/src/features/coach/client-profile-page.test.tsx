@@ -9,7 +9,7 @@ vi.mock('../../lib/api',()=>({apiRequest:vi.fn()}));
 vi.mock('../auth/auth-context',()=>({useAuth:vi.fn()}));
 vi.mock('./client-wizard',()=>({ClientWizard:({clientId,onClose}:{clientId:string;onClose:()=>void})=><div>Edit {clientId}<button onClick={onClose}>Close editor</button></div>}));
 const profile:ClientProfile={client:{id:'client',displayName:'Taylor Client',email:'taylor@example.test',phone:null,status:'APPROVED',joinedAt:'2026-09-01'},onboarding:{status:'SUBMITTED',data:{age:30,weight:72}},program:null,nutrition:null,subscription:null,progress:[],workouts:[],checkins:[]};
-beforeEach(()=>{vi.mocked(useAuth).mockReturnValue({ready:true,user:{id:'coach',role:'COACH',approvalStatus:'APPROVED',displayName:'Coach',email:'coach@example.test',businessName:null,createdAt:'2026-09-01'},login:vi.fn(),logout:vi.fn(),updateProfile:vi.fn()});});
+beforeEach(()=>{vi.mocked(useAuth).mockReturnValue({ready:true,user:{id:'coach',role:'COACH',approvalStatus:'APPROVED',displayName:'Coach',email:'coach@example.test',businessName:null,createdAt:'2026-09-01'},login:vi.fn(),logout:vi.fn(),updateProfile:vi.fn(),switchToClient:vi.fn()});});
 afterEach(()=>{cleanup();vi.resetAllMocks();});
 function page(path='/coach/clients/client'){render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/coach/clients/:clientId" element={<ClientProfilePage/>}/><Route path="/coach" element={<p>Client list</p>}/></Routes></MemoryRouter>);}
 it('renders a dedicated client identity and navigates tabs and back to clients',async()=>{

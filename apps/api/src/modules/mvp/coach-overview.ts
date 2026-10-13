@@ -11,7 +11,7 @@ export function createCoachOverviewRouter(pool: Pool): Router {
     // is scoped to this coach's currently approved relationships and accounts.
     const result = await pool.query<{ overview: unknown }>(`
       WITH active_clients AS (
-        SELECT cc.client_id, COALESCE(cp.display_name,'Client') AS name
+        SELECT cc.client_id, COALESCE(cp.display_name,'Client') AS name,u.email::text email,cc.created_at joined_at
         FROM coach_clients cc JOIN users u ON u.id=cc.client_id
         LEFT JOIN client_profiles cp ON cp.user_id=cc.client_id
         WHERE cc.coach_id=$1 AND cc.status='APPROVED' AND u.account_status='APPROVED'
@@ -32,6 +32,24 @@ export function createCoachOverviewRouter(pool: Pool): Router {
         SELECT w.id,w.client_id,a.name,w.completed_at,w.workout_snapshot
         FROM workout_sessions w JOIN active_clients a ON a.client_id=w.client_id
         WHERE w.coach_id=$1 AND w.status='COMPLETED' AND w.completed_at IS NOT NULL
+      ), latest_clients AS (
+        SELECT a.*,COALESCE(p.data->>'name',sub.plan_name) package_name,sub.status membership_status
+        FROM active_clients a LEFT JOIN client_setup cs ON cs.client_id=a.client_id AND cs.coach_id=$1
+        LEFT JOIN coaching_packages p ON p.id=cs.package_id AND p.coach_id=$1
+        LEFT JOIN subscriptions sub ON sub.client_id=a.client_id AND sub.coach_id=$1
+        ORDER BY a.joined_at DESC,a.client_id LIMIT 5
+      ), latest_checkins AS (
+        SELECT s.id,s.client_id,a.name,s.submitted_at,s.status,c.due_date,
+          COALESCE(to_jsonb(c)->'form_snapshot'->>'name','Check-in') form_name
+        FROM checkin_submissions s JOIN active_clients a ON a.client_id=s.client_id
+        JOIN checkin_assignments c ON c.id=s.assignment_id AND c.coach_id=$1
+        WHERE s.coach_id=$1 AND s.status IN ('SUBMITTED','REVIEWED') AND s.submitted_at IS NOT NULL
+        ORDER BY s.submitted_at DESC,s.id LIMIT 5
+      ), latest_messages AS (
+        SELECT f.id,f.client_id,a.name,f.message,f.context,f.created_at,
+          CASE WHEN f.author_user_id=$1 THEN 'You' ELSE a.name END author
+        FROM feedback_messages f JOIN active_clients a ON a.client_id=f.client_id
+        WHERE f.coach_id=$1 AND f.author_user_id=f.client_id ORDER BY f.created_at DESC,f.id LIMIT 5
       ), activity AS (
         SELECT 'workout:'||id AS id,client_id,name,'WORKOUT' AS kind,
           COALESCE(workout_snapshot->>'name','Workout') AS title,completed_at AS happened_at FROM completed
@@ -53,6 +71,9 @@ export function createCoachOverviewRouter(pool: Pool): Router {
         'dueToday',(SELECT count(*)::int FROM due WHERE due_date=COALESCE($2::date,CURRENT_DATE)),
         'overdue',(SELECT count(*)::int FROM due WHERE due_date<COALESCE($2::date,CURRENT_DATE)),
         'completedWorkouts7d',(SELECT count(*)::int FROM completed WHERE completed_at>=now()-interval '7 days' AND completed_at<=now()),
+        'latestClients',COALESCE((SELECT json_agg(json_build_object('clientId',client_id,'clientName',name,'email',email,'packageName',package_name,'membershipStatus',membership_status,'joinedAt',joined_at) ORDER BY joined_at DESC,client_id) FROM latest_clients),'[]'::json),
+        'latestCheckins',COALESCE((SELECT json_agg(json_build_object('id',id,'clientId',client_id,'clientName',name,'formName',form_name,'submittedAt',submitted_at,'dueDate',due_date::text,'status',status) ORDER BY submitted_at DESC,id) FROM latest_checkins),'[]'::json),
+        'latestMessages',COALESCE((SELECT json_agg(json_build_object('id',id,'clientId',client_id,'clientName',name,'author',author,'message',left(message,300),'context',context,'createdAt',created_at) ORDER BY created_at DESC,id) FROM latest_messages),'[]'::json),
         'onboarding',COALESCE((SELECT json_agg(json_build_object('clientId',client_id,'clientName',name,'submittedAt',submitted_at) ORDER BY submitted_at,client_id)
           FROM (SELECT * FROM onboarding ORDER BY submitted_at,client_id LIMIT 5) items),'[]'::json),
         'dueCheckins',COALESCE((SELECT json_agg(json_build_object('id',id,'clientId',client_id,'clientName',name,'dueDate',due_date::text) ORDER BY due_date,id)

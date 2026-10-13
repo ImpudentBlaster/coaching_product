@@ -1,3 +1,4 @@
+import { ClientMailer } from '../identity/mailer.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import type { Pool, PoolClient } from 'pg';
@@ -20,8 +21,10 @@ export const clientSetupSchema = z
     phone: z.string().trim().max(40),
     weightUnit: z.enum(['KG', 'LB']),
     exerciseUnit: z.enum(['KG', 'LB']),
+    packageId: optionalId.optional(),
     programId: optionalId,
     nutritionPlanId: optionalId,
+    supplementPlanId: optionalId.optional(),
     membership: z
       .object({
         name: z.string().trim().min(2).max(150),
@@ -47,7 +50,7 @@ export const clientSetupSchema = z
   })
   .strict();
 export type ClientSetup = z.infer<typeof clientSetupSchema>;
-class SetupError extends Error {
+export class SetupError extends Error {
   constructor(
     message: string,
     readonly status = 409,
@@ -101,12 +104,21 @@ export function setupDates(schedule: NonNullable<ClientSetup['checkin']>) {
   }
   return dates;
 }
-async function validateSelections(
+export async function validateSelections(
   c: PoolClient,
   coachId: string,
-  data: ClientSetup,
+  data: Pick<ClientSetup, 'programId' | 'nutritionPlanId' | 'supplementPlanId' | 'checkin' | 'packageId'>,
   previous: ClientSetup | null = null,
+  allowArchivedPackage = false,
 ) {
+  if (data.packageId) {
+    const bundle = await c.query<{ archived_at: string | null }>(
+      'SELECT archived_at FROM coaching_packages WHERE id=$1 AND coach_id=$2 FOR SHARE',
+      [data.packageId, coachId],
+    );
+    if (!bundle.rows[0] || (bundle.rows[0].archived_at && !allowArchivedPackage && data.packageId !== previous?.packageId))
+      throw new SetupError('Choose an available package belonging to you.', 400);
+  }
   const programChanged = data.programId !== previous?.programId;
   const nutritionChanged = data.nutritionPlanId !== previous?.nutritionPlanId;
   const program =
@@ -132,6 +144,8 @@ async function validateSelections(
       'Choose an available nutrition plan belonging to you.',
       400,
     );
+  const supplement = data.supplementPlanId && data.supplementPlanId !== previous?.supplementPlanId ? (await c.query<{data: object}>("SELECT data FROM nutrition_library WHERE id=$1 AND coach_id=$2 AND kind='supplements' AND archived_at IS NULL FOR SHARE", [data.supplementPlanId, coachId])).rows[0] : null;
+  if(data.supplementPlanId && data.supplementPlanId !== previous?.supplementPlanId && !supplement) throw new SetupError('Choose an available supplement plan belonging to you.',400);
   const form = data.checkin
     ? (
         await c.query<{ id: string; version: number; definition: Definition }>(
@@ -142,7 +156,7 @@ async function validateSelections(
     : null;
   if (data.checkin && !form)
     throw new SetupError('Choose a check-in form belonging to you.', 400);
-  return { program, nutrition, form };
+  return { program, nutrition, supplement, form };
 }
 // Called inside the registration transaction, after the pending relationship exists.
 // Account approval still controls access to all assigned content.
@@ -162,11 +176,12 @@ export async function applyClientSetup(
     ).rowCount
   )
     throw new SetupError('Approved coach required', 403);
-  const { program, nutrition, form } = await validateSelections(
+  const { program, nutrition, supplement, form } = await validateSelections(
     c,
     coachId,
     data,
     previous,
+    true,
   );
   await c.query(
     'UPDATE client_profiles SET display_name=$1,updated_at=now() WHERE user_id=$2',
@@ -198,6 +213,10 @@ export async function applyClientSetup(
           JSON.stringify(nutrition.data),
         ],
       );
+  }
+  if ((data.supplementPlanId ?? null) !== (previous?.supplementPlanId ?? null)) {
+    await c.query('UPDATE supplement_plan_assignments SET active=false WHERE coach_id=$1 AND client_id=$2 AND active', [coachId, clientId]);
+    if(supplement) await c.query('INSERT INTO supplement_plan_assignments(coach_id,client_id,plan_id,snapshot) VALUES($1,$2,$3,$4)', [coachId,clientId,data.supplementPlanId,JSON.stringify(supplement.data)]);
   }
   if (
     JSON.stringify(data.membership) !==
@@ -261,8 +280,8 @@ export async function applyClientSetup(
     }
   }
   await c.query(
-    'INSERT INTO client_setup(coach_id,client_id,data) VALUES($1,$2,$3) ON CONFLICT(coach_id,client_id) DO UPDATE SET data=excluded.data,revision=client_setup.revision+1,updated_at=now()',
-    [coachId, clientId, JSON.stringify(data)],
+    'INSERT INTO client_setup(coach_id,client_id,data,package_id) VALUES($1,$2,$3,$4) ON CONFLICT(coach_id,client_id) DO UPDATE SET data=excluded.data,package_id=excluded.package_id,revision=client_setup.revision+1,updated_at=now()',
+    [coachId, clientId, JSON.stringify(data), data.packageId ?? null],
   );
   await audit(c, coachId, 'CLIENT_SETUP_SAVED', clientId);
 }
@@ -309,6 +328,7 @@ async function loadClient(c: PoolClient, coachId: string, clientId: string) {
         [coachId, clientId],
       )
     ).rows[0]?.plan_id ?? null;
+  data.supplementPlanId = (await c.query<{plan_id:string}>('SELECT plan_id FROM supplement_plan_assignments WHERE coach_id=$1 AND client_id=$2 AND active',[coachId,clientId])).rows[0]?.plan_id ?? null;
   const membership = (
     await c.query<NonNullable<ClientSetup['membership']>>(
       'SELECT plan_name name,status,starts_on::text "startsOn",ends_or_renews_on::text "endsOn",notes FROM subscriptions WHERE coach_id=$1 AND client_id=$2',
@@ -318,7 +338,7 @@ async function loadClient(c: PoolClient, coachId: string, clientId: string) {
   data.membership = membership ?? null;
   return { data, revision: saved?.revision ?? 0 };
 }
-export function createClientSetupRouter(pool: Pool): Router {
+export function createClientSetupRouter(pool: Pool, environment?: import('../../config/environment.js').Environment): Router {
   const router = Router();
   router.post('/', async (req, res) => {
     const data = clientSetupSchema.parse(req.body);
@@ -360,7 +380,8 @@ export function createClientSetupRouter(pool: Pool): Router {
       await audit(c, req.auth!.userId, 'CLIENT_SETUP_INVITED', row.id);
       return row;
     });
-    res.status(201).json({ invitation: { ...invitation, token } });
+    const delivery = environment ? await new ClientMailer(environment).send(data.email, 'registration', token) : { status: 'not_configured' };
+    res.status(201).json({ invitation: { ...invitation, token }, delivery });
   });
   router.get('/invitations/:id', async (req, res) => {
     const id = z.string().uuid().parse(req.params.id);
@@ -403,15 +424,15 @@ export function createClientSetupRouter(pool: Pool): Router {
       .parse(req.body);
     await transaction(pool, async (c) => {
       const row = (
-        await c.query<{ setup_revision: number }>(
-          'SELECT setup_revision FROM client_invitations WHERE id=$1 AND coach_id=$2 AND used_at IS NULL AND revoked_at IS NULL AND expires_at>now() FOR UPDATE',
+        await c.query<{ setup_revision: number; setup: ClientSetup | null }>(
+          'SELECT setup_revision,setup FROM client_invitations WHERE id=$1 AND coach_id=$2 AND used_at IS NULL AND revoked_at IS NULL AND expires_at>now() FOR UPDATE',
           [id, req.auth!.userId],
         )
       ).rows[0];
       if (!row) throw new SetupError('Pending invitation not found', 404);
       if (row.setup_revision !== input.revision)
         throw new SetupError('This invitation changed. Reload before saving.');
-      await validateSelections(c, req.auth!.userId, input.data);
+      await validateSelections(c, req.auth!.userId, input.data, row.setup);
       if (
         (
           await c.query('SELECT id FROM users WHERE email=$1', [
@@ -449,6 +470,7 @@ export function createClientSetupRouter(pool: Pool): Router {
         throw new SetupError('This client changed. Reload before saving.');
       if (previous.data.email !== input.data.email)
         throw new SetupError('Account email cannot be changed here.', 400);
+      await validateSelections(c, req.auth!.userId, input.data, previous.data);
       await applyClientSetup(
         c,
         req.auth!.userId,
@@ -470,7 +492,9 @@ export function createClientSetupRouter(pool: Pool): Router {
         res
           .status(400)
           .json({
-            message: 'Check the client details.',
+            message: error.issues.some(issue => issue.path.includes('birthDate'))
+              ? 'Date of birth must be a valid date in the past. Enter the client’s birth date or leave it blank.'
+              : 'Check the client details.',
             details: error.flatten(),
           });
         return;

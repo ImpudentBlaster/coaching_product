@@ -19,7 +19,7 @@ describe.skipIf(!process.env.DATABASE_URL)('coach client profile',()=>{
   const app=express();app.use(express.json());app.use(createMvpRouter(env,pool));
   beforeAll(async()=>{
     await admin.query(`CREATE SCHEMA ${schema}`);
-    for(const file of ['001_identity_approvals.sql','002_demo_mvp.sql','003_nutrition_library.sql','004_checkin_forms.sql','005_daily_checkin_photos.sql','006_library_management.sql','007_client_setup.sql'])await pool.query(await readFile(new URL(`../../../db/migrations/${file}`,import.meta.url),'utf8'));
+    for(const file of ['001_identity_approvals.sql','002_demo_mvp.sql','003_nutrition_library.sql', '014_supplement_plans.sql','004_checkin_forms.sql','005_daily_checkin_photos.sql','006_library_management.sql','007_client_setup.sql'])await pool.query(await readFile(new URL(`../../../db/migrations/${file}`,import.meta.url),'utf8'));
     for(const id of [coach,other,client])await pool.query("INSERT INTO users(id,email,password_hash,role,account_status) VALUES($1,$2,'unused-test-hash',$3,'APPROVED')",[id,`${id}@example.test`,id===client?'CLIENT':'COACH']);
     await pool.query("INSERT INTO client_profiles(user_id,display_name) VALUES($1,'Profile client')",[client]);
     await pool.query("INSERT INTO coach_clients(coach_id,client_id,status) VALUES($1,$2,'APPROVED')",[coach,client]);

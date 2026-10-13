@@ -1,3 +1,4 @@
+import { SelectControl } from '../../components/form-controls';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { apiRequest } from '../../lib/api';
 import { Notice } from '../../components/editor-dialog';
@@ -12,7 +13,7 @@ import './plan-builder.css';
 type PlanDay={key:string;name:string;notes:string;type:'days'|'custom';dayId:string;entries:DayEntry[]};
 type DayIssue={message:string;name?:string;source?:string;meals?:Record<string,MealIssue>};
 const newDay=():PlanDay=>({key:crypto.randomUUID(),name:'',notes:'',type:'days',dayId:'',entries:[]});
-export function PlanBuilder({initial,entries,onBusy,onSaved,onMessage,onNavigate,formId,onReady,onSubmitting}:{initial?:NutritionEntry|undefined;entries:NutritionEntry[];onBusy:(busy:boolean)=>void;onSaved:()=>Promise<void>;onMessage:(message:string)=>void;onNavigate:(kind:NutritionNode['kind'])=>void;formId:string;onReady:(value:boolean)=>void;onSubmitting:(value:boolean)=>void}) {
+export function PlanBuilder({initial,entries,onBusy,onSaved,onMessage,onNavigate,formId,onReady,onSubmitting}:{initial?:NutritionEntry|undefined;entries:NutritionEntry[];onBusy:(busy:boolean)=>void;onSaved:(id?:string)=>Promise<void>;onMessage:(message:string)=>void;onNavigate:(kind:NutritionNode['kind'])=>void;formId:string;onReady:(value:boolean)=>void;onSubmitting:(value:boolean)=>void}) {
   const [days,setDays]=useState<PlanDay[]>(()=>initial?.data.items?.map(item=>({key:item.node.custom?item.id:crypto.randomUUID(),name:item.label??item.node.name,notes:item.node.custom?item.node.notes:'',type:item.node.custom?'custom':'days',dayId:item.node.custom?'':item.id,entries:item.node.custom?initialDayEntries(item.node):[]}))??[newDay()]);
   const [activeDay,setActiveDay]=useState<string|null>(()=>initial?null:days[0]?.key??null);
   const [name,setName]=useState(initial?.data.name??'');const [notes,setNotes]=useState(initial?.data.notes??'');
@@ -61,8 +62,8 @@ export function PlanBuilder({initial,entries,onBusy,onSaved,onMessage,onNavigate
     const items=days.map(day=>day.type==='days'?{id:day.dayId,label:day.name}:{id:day.key,type:'custom',label:day.name,notes:day.notes,items:serializeDayEntries(day.entries)});
     submitting.current=true;setSaving(true);onBusy(true);onSubmitting(true);setError('');
     try {
-      await apiRequest('/coach/nutrition-library/plans'+(initial?'/'+initial.id:''),{method:initial?'PUT':'POST',body:JSON.stringify({name,notes,items,version:initial?.version??1})});
-      onMessage('Nutrition plan '+(initial?'updated':'created')+'.');await onSaved();
+      const result=await apiRequest<{entry:{id:string}}>('/coach/nutrition-library/plans'+(initial?'/'+initial.id:''),{method:initial?'PUT':'POST',body:JSON.stringify({name,notes,items,version:initial?.version??1})});
+      onMessage('Nutrition plan '+(initial?'updated':'created')+'.');await onSaved(result?.entry?.id);
     }catch(cause){setError(cause instanceof Error?cause.message:'Unable to save plan. Please try again.');}
     finally{submitting.current=false;setSaving(false);onBusy(false);onSubmitting(false);}
   }
@@ -86,8 +87,8 @@ export function PlanBuilder({initial,entries,onBusy,onSaved,onMessage,onNavigate
             </button><button type="button" className="danger icon-button" title="Remove day" aria-label={'Remove day '+(day.name||index+1)} disabled={days.length===1} onClick={()=>{markDirty();setDays(current=>current.filter(item=>item.key!==day.key));if(open)setActiveDay(null);}}>×</button></div>
             {open&&<div className="builder-section-content" id={formId+'-'+day.key}>
               <div className="form-row"><label>Day name<input aria-label="Day name" required maxLength={100} placeholder="e.g. Training day" value={day.name} aria-invalid={!!issue?.name} onChange={event=>updateDay(day.key,{name:event.target.value})}/>{issue?.name&&<small className="builder-field-error">{issue.name}</small>}</label>
-              <label>Day type<select value={day.type} onChange={event=>updateDay(day.key,{type:event.target.value as PlanDay['type']})}><option value="days">Use saved day</option><option value="custom">Build day</option></select></label></div>
-              {day.type==='days'?<label>Day template<select required value={day.dayId} aria-invalid={!!issue?.source} onChange={event=>{const dayId=event.target.value;updateDay(day.key,{dayId,...(!day.name?{name:templates.find(entry=>entry.id===dayId)?.data.name??''}:{})});}}><option value="">Choose day</option>{day.dayId&&!template&&<option value={day.dayId} disabled>Unavailable day — choose a replacement</option>}{templates.map(entry=><option key={entry.id} value={entry.id}>{entry.data.name}</option>)}</select>{issue?.source&&<small className="builder-field-error">{issue.source}</small>}</label>:<>
+              <label>Day type<SelectControl aria-label="Day type" value={day.type} onChange={event=>updateDay(day.key,{type:event.target.value as PlanDay['type']})}><option value="days">Use saved day</option><option value="custom">Build day</option></SelectControl></label></div>
+              {day.type==='days'?<label>Day template<SelectControl aria-label="Day template" required value={day.dayId} aria-invalid={!!issue?.source} onChange={event=>{const dayId=event.target.value;updateDay(day.key,{dayId,...(!day.name?{name:templates.find(entry=>entry.id===dayId)?.data.name??''}:{})});}}><option value="">Choose day</option>{day.dayId&&!template&&<option value={day.dayId} disabled>Unavailable day — choose a replacement</option>}{templates.map(entry=><option key={entry.id} value={entry.id}>{entry.data.name}</option>)}</SelectControl>{issue?.source&&<small className="builder-field-error">{issue.source}</small>}</label>:<>
                 <label>Day notes<textarea maxLength={2000} rows={2} value={day.notes} onChange={event=>updateDay(day.key,{notes:event.target.value})}/></label>
                 {issue&&!issue.name&&!issue.source&&!issue.meals&&<p role="alert" className="builder-field-error">{issue.message}</p>}
                 <CompactMealsEditor meals={day.entries} setMeals={update=>{markDirty();setDays(current=>current.map(item=>item.key===day.key?{...item,entries:typeof update==='function'?update(item.entries):update}:item));setDayIssues(current=>{const next={...current};delete next[day.key];return next;});}} templates={library.meals} foods={library.foods} chooseFood={library.chooseFood} issues={issue?.meals} onPendingChange={setPendingFood}/>

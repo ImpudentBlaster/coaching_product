@@ -7,7 +7,7 @@ export function ClientRegisterPage() {
   const { login, ready } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const token = params.get('invite') ?? '';
+  const token = new URLSearchParams(window.location.hash.slice(1)).get('invite') ?? params.get('invite') ?? '';
   const [invitation, setInvitation] = useState<{
     email: string;
     displayName: string;

@@ -11,7 +11,7 @@ vi.mock('../auth/auth-context',()=>({useAuth:vi.fn()}));
 vi.mock('./client-wizard',()=>({ClientWizard:({onClose}:{onClose:()=>void})=><div>Client setup<button onClick={onClose}>Back to dashboard</button></div>}));
 const empty:CoachOverviewData={activeClients:0,pendingClients:0,onboardingReviews:0,checkinReviews:0,dueToday:0,overdue:0,completedWorkouts7d:0,onboarding:[],dueCheckins:[],activity:[]};
 beforeEach(()=>{
-  vi.mocked(useAuth).mockReturnValue({ready:true,user:{id:'coach',role:'COACH',approvalStatus:'APPROVED',displayName:'Alex',email:'coach@example.test',businessName:'Coaching',createdAt:'2026-09-20'},login:vi.fn(),logout:vi.fn(),updateProfile:vi.fn()});
+  vi.mocked(useAuth).mockReturnValue({ready:true,user:{id:'coach',role:'COACH',approvalStatus:'APPROVED',displayName:'Alex',email:'coach@example.test',businessName:'Coaching',createdAt:'2026-09-20'},login:vi.fn(),logout:vi.fn(),updateProfile:vi.fn(),switchToClient:vi.fn()});
 });
 afterEach(()=>{cleanup();vi.resetAllMocks();});
 function renderPage(path='/coach'){render(<MemoryRouter initialEntries={[path]}><CoachDashboard/></MemoryRouter>);}
@@ -58,4 +58,15 @@ it('does not fetch dashboard data for an unapproved coach',()=>{
   const current=vi.mocked(useAuth)();
   vi.mocked(useAuth).mockReturnValue({...current,user:{...current.user!,approvalStatus:'PENDING_REVIEW'}});
   renderPage();expect(screen.getByText('Your application is under review')).toBeInTheDocument();expect(apiRequest).not.toHaveBeenCalled();
+});
+it('shows the latest client, check-in and feedback tables alongside the existing overview', async () => {
+  vi.mocked(apiRequest).mockResolvedValue({ overview: { ...empty, latestClients: [{ clientId: 'one', clientName: 'Taylor', email: 'taylor@example.test', packageName: 'Gold coaching', membershipStatus: 'ACTIVE', joinedAt: '2026-10-07T10:00:00Z' }], latestCheckins: [{ id: 'checkin', clientId: 'one', clientName: 'Taylor', formName: 'Weekly review', dueDate: '2026-10-07', submittedAt: '2026-10-07T10:00:00Z', status: 'SUBMITTED' }], latestMessages: [{ id: 'message', clientId: 'one', clientName: 'Taylor', author: 'Taylor', message: 'Training went well', context: 'GENERAL', createdAt: '2026-10-07T10:00:00Z' }] } });
+  renderPage();
+  const clients = await screen.findByRole('table', { name: 'Latest clients' });
+  expect(within(clients).getByText('Gold coaching')).toBeInTheDocument();
+  expect(within(clients).getByRole('link', { name: 'View client Taylor' })).toHaveAttribute('href', '/coach/clients/one');
+  expect(within(screen.getByRole('table', { name: 'Latest check-ins' })).getByText('Weekly review')).toBeInTheDocument();
+  expect(within(screen.getByRole('table', { name: 'Latest messages' })).getByText('Training went well')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Needs your attention' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Recent activity' })).toBeInTheDocument();
 });

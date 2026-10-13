@@ -72,6 +72,14 @@ Run `pnpm --filter @coaching/web dev --host 127.0.0.1` in another terminal. The 
 
 The demo includes coach/client approvals, rotating `HttpOnly` refresh sessions, logout, logout-all API support, admin-issued one-time password reset codes, and session restoration after page reload. Demo data and sessions are erased when the API restarts.
 
+## Client access and email
+
+In PostgreSQL mode, the coach client actions include deletion, password reset email, registration reminder email, and switching to an approved client. Deletion removes the client from the coach list and revokes access while retaining coaching records and audit history. Switching ends the current coach session and creates an audited client session lasting up to one hour; sign in again to return to coaching. Other coach sessions are unaffected.
+
+Registration emails use Nodemailer SMTP. Configure `SMTP_HOST`, `SMTP_PORT` (587 by default), `SMTP_SECURE` (true for implicit TLS, usually port 465), `SMTP_USER`, `SMTP_PASSWORD`, and `MAIL_FROM` in the API environment. `WEB_ORIGIN` must be the public frontend URL. SMTP credentials must never be committed. Production SMTP requires TLS. Configuration fields are documented in `apps/api/.env.example`.
+
+New invitations send a seven-day single-use password setup link. Resending an unused invitation keeps its setup and replaces its old link. Registered clients receive a sign-in reminder; use Reset password to send a 30-minute single-use password reset link. Successful resets revoke all client sessions. Tokens are hashed in PostgreSQL and email links use fragments to keep tokens out of HTTP request URLs. Missing SMTP configuration or delivery errors are shown without claiming success; no external email is sent by tests.
+
 ## Source data
 
 `exercises_1.json` and `exercise_images/` are local Phase 2 import inputs and are ignored by Git. The application does not mutate them.

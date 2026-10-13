@@ -1,0 +1,48 @@
+.coach-overview .dashboard-head { margin-bottom: var(--space-5); gap: var(--space-4); }
+.coach-overview .dashboard-head > .actions { flex: 0 0 auto; margin-left: auto; justify-content: flex-end; align-self: center; }
+.coach-overview .dashboard-head h1 { font-size: clamp(1.5rem, 2.5vw, 2rem); }
+.coach-overview .dashboard-head .lede { font-size: var(--font-body); margin-top: var(--space-2); }
+.coach-overview .overview-metric { padding: var(--space-4) var(--space-5); gap: var(--space-2); }
+.coach-overview .overview-metric > strong { font-size: 2.5rem; }
+.coach-overview .overview-panel { padding: var(--space-5); }
+.coach-overview .overview-panel > header { padding-bottom: var(--space-3); }
+.coach-overview .overview-panel h2 { font-size: var(--font-section); }
+.coach-overview .overview-task { padding: var(--space-3) 0; gap: var(--space-3); }
+.coach-overview .overview-due-totals { padding: var(--space-3); margin-bottom: var(--space-3); }
+.coach-overview .overview-due-totals strong { font-size: 1.4rem; }
+.coach-overview .overview-empty { padding: var(--space-4) 0; }
+.overview-priority { display: grid; gap: var(--space-5); }
+.overview-attention { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--space-5); }
+.overview-attention > header, .overview-attention > .overview-note, .overview-attention > .overview-empty { grid-column: 1 / -1; }
+.overview-attention .overview-task { min-width: 0; }
+.overview-outstanding { margin-top: var(--space-3); border-top: 1px solid var(--color-border); }
+.overview-outstanding > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-3); font-size: var(--font-body); font-weight: var(--weight-label); cursor: pointer; list-style: none; }
+.overview-outstanding > summary::-webkit-details-marker { display: none; }
+.overview-outstanding > summary::after { content: ''; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); margin: 0 var(--space-1); }
+.overview-outstanding[open] > summary::after { transform: rotate(225deg); }
+.overview-outstanding > summary .overview-count { margin-left: auto; }
+.overview-outstanding-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--space-5); padding-top: var(--space-3); }
+.overview-outstanding-list > .overview-note, .overview-outstanding-list > .overview-empty { grid-column: 1 / -1; }
+.dashboard-latest { display: grid; gap: var(--space-5); margin-top: var(--space-5); }
+.dashboard-latest .overview-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+.latest-panel .overview-note { margin: var(--space-1) 0 0; font-size: var(--font-helper); }
+.latest-table-scroll { overflow-x: auto; max-width: 100%; }
+.latest-table { width: 100%; min-width: 650px; border-collapse: collapse; text-align: left; font-size: var(--font-body); }
+.latest-table th { padding: var(--space-3) var(--space-2); font-size: var(--font-helper); color: var(--color-muted); background: var(--color-surface-subtle); white-space: nowrap; }
+.latest-table td { padding: var(--space-3) var(--space-2); border-bottom: 1px solid var(--color-border); vertical-align: middle; overflow-wrap: anywhere; }
+.latest-table tbody tr:last-child td { border-bottom: 0; }
+.latest-table small { display: block; font-size: var(--font-helper); color: var(--color-muted); margin-top: var(--space-1); }
+.latest-table time { font-size: var(--font-helper); white-space: nowrap; color: var(--color-muted); }
+.latest-table .status { display: inline-flex; white-space: nowrap; }
+.latest-client-name { display: flex; align-items: center; gap: var(--space-2); min-width: 150px; }
+.latest-client-name .overview-task-icon { width: 30px; height: 30px; font-size: var(--font-helper); }
+.latest-client-email { margin-left: 38px; max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.latest-table .secondary { display: inline-flex; align-items: center; }
+.latest-table .latest-view-icon { width: 38px; height: 38px; min-height: 38px; padding: 0; justify-content: center; }
+.latest-view-icon svg { width: 20px; height: 20px; }
+.latest-table td:last-child, .latest-table th:last-child { white-space: nowrap; }
+.latest-message-text { margin: var(--space-1) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.latest-messages .latest-table td:nth-child(2) { width: 55%; }
+@media (max-width: 1100px) { .dashboard-latest .overview-columns { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 540px) { .coach-overview .overview-panel { padding: var(--space-4); } }
+@media (max-width: 700px) { .overview-attention, .overview-outstanding-list { grid-template-columns: minmax(0, 1fr); } }

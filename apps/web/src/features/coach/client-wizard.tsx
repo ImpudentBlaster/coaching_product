@@ -1,5 +1,11 @@
+import { BirthDatePicker } from '../../components/birth-date-picker';
+import { formatDate } from '../../lib/dates';
+import { notify } from '../../lib/notify';
+import { SelectControl, DateControl } from '../../components/form-controls';
+import { parseDate } from '@internationalized/date';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { apiRequest, type Program } from '../../lib/api';
+import type { CoachingPackage } from './packages-page';
 
 type Schedule = {
   formId: string;
@@ -16,6 +22,7 @@ type Membership = {
   notes: string;
 };
 type Setup = {
+  packageId?: string | null;
   firstName: string;
   lastName: string;
   email: string;
@@ -24,7 +31,7 @@ type Setup = {
   weightUnit: 'KG' | 'LB';
   exerciseUnit: 'KG' | 'LB';
   programId: string | null;
-  nutritionPlanId: string | null;
+  nutritionPlanId: string | null; supplementPlanId?: string | null;
   membership: Membership | null;
   checkin: Schedule | null;
 };
@@ -79,19 +86,23 @@ export function ClientWizard({
   const [step, setStep] = useState(0);
   const [programs, setPrograms] = useState<Option[]>([]);
   const [nutrition, setNutrition] = useState<Option[]>([]);
+  const [supplements, setSupplements] = useState<Option[]>([]);
   const [forms, setForms] = useState<Option[]>([]);
+  const [packages, setPackages] = useState<CoachingPackage[]>([]);
+  const [packageId, setPackageId] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [link, setLink] = useState('');
   const [saved, setSaved] = useState(false);
+  const [mailStatus, setMailStatus] = useState('');
   const [dirty, setDirty] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   async function load() {
     setLoading(true);
     setError('');
     try {
-      const [p, n, f, s] = await Promise.all([
+      const [p, n, f, s, bundles] = await Promise.all([
         apiRequest<{ programs: Program[] }>('/coach/programs'),
         apiRequest<{
           entries: Array<{
@@ -109,12 +120,15 @@ export function ClientWizard({
               `/coach/client-setup/${resource}`,
             )
           : Promise.resolve(null),
+        apiRequest<{ packages: CoachingPackage[] }>('/coach/packages'),
       ]);
+      setPackages(bundles.packages.filter(item => !item.archivedAt || item.id === s?.data.packageId));
       setPrograms(
         p.programs
           .filter((item) => item.status === 'PUBLISHED')
           .map((item) => ({ id: item.id, name: item.name })),
       );
+      setSupplements(n.entries.filter(item => item.data.kind === 'supplements' && !item.archivedAt).map(item => ({id:item.id,name:item.data.name})));
       setNutrition(
         n.entries
           .filter((item) => item.data.kind === 'plans' && !item.archivedAt)
@@ -125,6 +139,7 @@ export function ClientWizard({
       );
       if (s) {
         setData(s.data);
+        setPackageId(s.data.packageId ?? '');
         setRevision(s.revision);
       }
     } catch (caught) {
@@ -166,6 +181,11 @@ export function ClientWizard({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
+    if (data.birthDate && data.birthDate >= new Date().toISOString().slice(0, 10)) {
+      setStep(0);
+      notify.error('Date of birth must be in the past. Enter the client’s birth date or leave it blank.');
+      return;
+    }
     if (step < 3) {
       setStep(step + 1);
       return;
@@ -179,21 +199,22 @@ export function ClientWizard({
           body: JSON.stringify({ data, revision }),
         });
       else {
-        const result = await apiRequest<{ invitation: { token: string } }>(
+        const result = await apiRequest<{ invitation: { token: string }; delivery?: { status: string } }>(
           '/coach/client-setup',
           { method: 'POST', body: JSON.stringify(data) },
         );
         setLink(
           `${window.location.origin}/register/client?invite=${encodeURIComponent(result.invitation.token)}`,
         );
+        setMailStatus(result.delivery?.status === 'sent' ? 'Registration email sent to the client.' : result.delivery?.status === 'failed' ? 'The invitation was saved, but email delivery failed. Resend it from Invitations or share the link below.' : 'Email is not configured. Share the registration link below, or configure SMTP and resend it from Invitations.');
       }
       setSaved(true);
       setDirty(false);
       await onSaved();
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : 'Unable to save client.',
-      );
+      const message = caught instanceof Error ? caught.message : 'Unable to save client.';
+      notify.error(message);
+      if (/changed.*reload|reload.*saving/i.test(message)) setError(message);
     } finally {
       setBusy(false);
     }
@@ -212,7 +233,7 @@ export function ClientWizard({
     return (
       <label>
         {label}
-        <select
+        <SelectControl aria-label={label}
           value={value ?? ''}
           onChange={(event) => change(event.target.value || null)}
         >
@@ -227,7 +248,7 @@ export function ClientWizard({
               {option.name}
             </option>
           ))}
-        </select>
+        </SelectControl>
       </label>
     );
   }
@@ -272,6 +293,7 @@ export function ClientWizard({
             <div className="wizard-success">
               <span className="wizard-success-icon">✓</span>
               <h2>{editing ? 'Client updated' : 'Invitation ready'}</h2>
+              {mailStatus && <p role="status">{mailStatus}</p>}
               <p>
                 {editing
                   ? 'The client details and selected assignments have been saved.'
@@ -356,17 +378,7 @@ export function ClientWizard({
                         <small>Account email is managed separately.</small>
                       )}
                     </label>
-                    <label>
-                      Date of birth
-                      <input
-                        type="date"
-                        max={today()}
-                        value={data.birthDate ?? ''}
-                        onChange={(event) =>
-                          update({ birthDate: event.target.value || null })
-                        }
-                      />
-                    </label>
+                    <BirthDatePicker value={data.birthDate} onChange={birthDate=>update({birthDate})}/>
                     <label>
                       Phone
                       <input
@@ -381,7 +393,7 @@ export function ClientWizard({
                     </label>
                     <label>
                       Weight measurement
-                      <select
+                      <SelectControl aria-label="Weight measurement"
                         value={data.weightUnit}
                         onChange={(event) =>
                           update({
@@ -391,7 +403,7 @@ export function ClientWizard({
                       >
                         <option value="KG">KG</option>
                         <option value="LB">LB</option>
-                      </select>
+                      </SelectControl>
                       <small>
                         Preferred unit for the client record. Existing
                         measurement fields retain their displayed units.
@@ -401,6 +413,26 @@ export function ClientWizard({
                 )}
                 {step === 1 && (
                   <>
+                    <label>Plan selection<SelectControl aria-label="Plan selection" value={packageId} onChange={event => {
+                      const id = event.target.value;
+                      setPackageId(id);
+                      if (!id) { update({ packageId: null }); return; }
+                      const bundle = packages.find(item => item.id === id)!.data;
+                      const startsOn = data.membership?.startsOn || today();
+                      update({
+                        packageId: id,
+                        programId: bundle.programId,
+                        nutritionPlanId: bundle.nutritionPlanId,
+                        supplementPlanId: bundle.supplementPlanId ?? null,
+                        checkin: bundle.checkin ? { ...bundle.checkin, startDate: startsOn } : null,
+                        membership: {
+                          name: bundle.name, status: 'PENDING', startsOn,
+                          endsOn: bundle.durationDays ? parseDate(startsOn).add({ days: bundle.durationDays }).toString() : null,
+                          notes: [bundle.description, `Plan type: ${bundle.paymentType.replaceAll('_', ' ').toLowerCase()}`, bundle.amount !== null ? `Amount: ${bundle.currency} ${bundle.amount}` : '', bundle.initialAmount !== null ? `Initial amount: ${bundle.currency} ${bundle.initialAmount}` : ''].filter(Boolean).join('\n').slice(0, 4000),
+                        },
+                      });
+                    }}><option value="">Add individual plans manually</option>{packages.map(item => <option key={item.id} value={item.id}>{item.data.name}</option>)}</SelectControl><small>Selecting a package replaces the plans, membership and check-in schedule below. You can adjust its copied details before saving.</small></label>
+                    {packageId && <p role="status">Package details copied. Changes here apply only to this client.</p>}
                     <label className="wizard-toggle">
                       <input
                         type="checkbox"
@@ -442,7 +474,7 @@ export function ClientWizard({
                         </label>
                         <label>
                           Membership status
-                          <select
+                          <SelectControl aria-label="Membership status"
                             value={data.membership.status}
                             onChange={(event) =>
                               update({
@@ -463,29 +495,31 @@ export function ClientWizard({
                             ].map((status) => (
                               <option key={status}>{status}</option>
                             ))}
-                          </select>
+                          </SelectControl>
                         </label>
                         <div className="form-row">
                           <label>
                             Start date
-                            <input
+                            <DateControl aria-label="Start date"
                               required
-                              type="date"
                               value={data.membership.startsOn}
-                              onChange={(event) =>
+                              onChange={(event) => {
+                                const duration = packages.find(item => item.id === packageId)?.data.durationDays;
                                 update({
                                   membership: {
                                     ...data.membership!,
                                     startsOn: event.target.value,
+                                    ...(duration ? {
+                                      endsOn: event.target.value ? parseDate(event.target.value).add({ days: duration }).toString() : null,
+                                    } : {}),
                                   },
-                                })
-                              }
+                                });
+                              }}
                             />
                           </label>
                           <label>
                             End / renewal date
-                            <input
-                              type="date"
+                            <DateControl aria-label="End / renewal date"
                               min={data.membership.startsOn}
                               value={data.membership.endsOn ?? ''}
                               onChange={(event) =>
@@ -525,12 +559,13 @@ export function ClientWizard({
                       nutrition,
                       (id) => update({ nutritionPlanId: id }),
                     )}
+                    {select('Supplement plan', data.supplementPlanId ?? null, supplements, id => update({supplementPlanId:id}))}
                     {select('Workout program', data.programId, programs, (id) =>
                       update({ programId: id }),
                     )}
                     <label>
                       Exercise measurement preference
-                      <select
+                      <SelectControl aria-label="Exercise measurement preference"
                         value={data.exerciseUnit}
                         onChange={(event) =>
                           update({
@@ -540,7 +575,7 @@ export function ClientWizard({
                       >
                         <option value="KG">KG</option>
                         <option value="LB">LB</option>
-                      </select>
+                      </SelectControl>
                     </label>
                     <p className="wizard-hint">
                       Choose from your saved nutrition plans and published
@@ -572,9 +607,8 @@ export function ClientWizard({
                       <>
                         <label>
                           First check-in date
-                          <input
+                          <DateControl aria-label="First check-in date"
                             required
-                            type="date"
                             value={data.checkin.startDate}
                             onChange={(event) =>
                               update({
@@ -588,7 +622,7 @@ export function ClientWizard({
                         </label>
                         <label>
                           Check-in frequency
-                          <select
+                          <SelectControl aria-label="Check-in frequency"
                             value={data.checkin.frequency}
                             onChange={(event) =>
                               update({
@@ -605,7 +639,7 @@ export function ClientWizard({
                             <option value="WEEKLY">Every week</option>
                             <option value="BIWEEKLY">Every two weeks</option>
                             <option value="MONTHLY">Every month</option>
-                          </select>
+                          </SelectControl>
                         </label>
                         {['WEEKLY', 'BIWEEKLY'].includes(
                           data.checkin.frequency,
@@ -703,7 +737,7 @@ export function ClientWizard({
                         <dt>Email</dt>
                         <dd>{data.email}</dd>
                         <dt>Date of birth</dt>
-                        <dd>{data.birthDate || 'Not provided'}</dd>
+                        <dd>{data.birthDate ? formatDate(data.birthDate) : 'Not provided'}</dd>
                         <dt>Phone</dt>
                         <dd>{data.phone || 'Not provided'}</dd>
                         <dt>Weight unit</dt>
@@ -728,14 +762,14 @@ export function ClientWizard({
                           <>
                             <dt>Membership dates</dt>
                             <dd>
-                              {data.membership.startsOn} →{' '}
-                              {data.membership.endsOn ?? 'No end date'}
+                              {formatDate(data.membership.startsOn)} →{' '}
+                              {data.membership.endsOn ? formatDate(data.membership.endsOn) : 'No end date'}
                             </dd>
                             <dt>Membership notes</dt>
                             <dd>{data.membership.notes || 'None'}</dd>
                           </>
                         )}
-                        <dt>Nutrition</dt>
+                        <dt>Supplements</dt><dd>{name(supplements, data.supplementPlanId ?? null)}</dd><dt>Nutrition</dt>
                         <dd>{name(nutrition, data.nutritionPlanId)}</dd>
                         <dt>Workout program</dt>
                         <dd>{name(programs, data.programId)}</dd>
@@ -758,7 +792,7 @@ export function ClientWizard({
                             <dt>Schedule</dt>
                             <dd>
                               {data.checkin.frequency.toLowerCase()} from{' '}
-                              {data.checkin.startDate} ·{' '}
+                              {formatDate(data.checkin.startDate)} ·{' '}
                               {data.checkin.frequency === 'ONCE'
                                 ? 1
                                 : data.checkin.occurrences}{' '}

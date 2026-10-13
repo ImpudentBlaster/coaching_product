@@ -1,3 +1,4 @@
+import { SelectControl } from '../../components/form-controls';
 import { NutritionTotals, type NutritionEntry, type NutritionNode } from './nutrition-details';
 import { FoodSelect } from './food-select';
 import type { Dispatch, SetStateAction } from 'react';
@@ -9,8 +10,8 @@ export function DayEntriesEditor({dayEntries,setDayEntries,meals,foods,chooseFoo
   return <>
       {dayEntries.map((entry,index)=><fieldset className="nutrition-fields" key={entry.key}><legend>Entry {index+1}</legend>
         <label>Entry name<input required maxLength={100} pattern=".*\S.*" placeholder="e.g. Breakfast" value={entry.name} onChange={event=>updateEntry(entry.key,{name:event.target.value})}/></label>
-        <label>Entry type<select value={entry.type} onChange={event=>updateEntry(entry.key,{type:event.target.value as DayEntry['type']})}><option value="custom">Add foods</option><option value="meals">Use saved meal</option></select></label>
-        {entry.type==='meals'?<label>Meal<select required value={entry.mealId} onChange={event=>{const mealId=event.target.value;updateEntry(entry.key,{mealId,...(!entry.name?{name:meals.find(meal=>meal.id===mealId)?.data.name??''}:{})});}}><option value="">Choose meal</option>{entry.mealId&&!meals.some(meal=>meal.id===entry.mealId)&&<option value={entry.mealId} disabled>Unavailable meal — choose a replacement</option>}{meals.map(meal=><option key={meal.id} value={meal.id}>{meal.data.name}</option>)}</select></label>:<>
+        <label>Entry type<SelectControl aria-label="Entry type" value={entry.type} onChange={event=>updateEntry(entry.key,{type:event.target.value as DayEntry['type']})}><option value="custom">Add foods</option><option value="meals">Use saved meal</option></SelectControl></label>
+        {entry.type==='meals'?<label>Meal<SelectControl aria-label="Meal" required value={entry.mealId} onChange={event=>{const mealId=event.target.value;updateEntry(entry.key,{mealId,...(!entry.name?{name:meals.find(meal=>meal.id===mealId)?.data.name??''}:{})});}}><option value="">Choose meal</option>{entry.mealId&&!meals.some(meal=>meal.id===entry.mealId)&&<option value={entry.mealId} disabled>Unavailable meal — choose a replacement</option>}{meals.map(meal=><option key={meal.id} value={meal.id}>{meal.data.name}</option>)}</SelectControl></label>:<>
           {entry.foods.map((food,index)=><fieldset className="nutrition-fields" key={food.key}><legend>Food {index+1}</legend>
             <FoodSelect index={index+1} options={foods} value={food.id} onSelect={id=>void selectFood(entry.key,food.key,id)}/>
             <label>Quantity ({foods.find(option=>option.id===food.id)?.data.unit??'food unit'})<input type="number" min="0.01" max="10000" step="any" required value={food.quantity} onChange={event=>updateFood(entry.key,food.key,{quantity:event.target.value})}/></label>

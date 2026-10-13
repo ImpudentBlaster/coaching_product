@@ -1,0 +1,25 @@
+.supplement-row { border: 1px solid var(--border, #e2e8f0); border-radius: 12px; padding: 16px; }
+.supplement-row-fields { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.6fr auto; gap: 16px; align-items: end; }
+.supplement-row-fields label { min-width: 0; }
+.supplement-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+.supplement-details dd { overflow-wrap: anywhere; }
+.supplement-list-preview { display: block; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #74847b; font-size: .75rem; margin-top: .3rem; }
+.supplement-plan-title { margin: 0 0 1rem; }
+.supplement-drawer-content .supplement-plan-title { display: none; }
+.supplement-details { display: grid; gap: .75rem; padding: 0; margin: 0; list-style: none; }
+.supplement-detail-card { border: 1px solid #dce5e0; border-radius: 12px; background: #f8faf7; padding: 1rem; min-width: 0; }
+.supplement-detail-heading { display: flex; gap: .75rem; align-items: center; }
+.supplement-detail-heading h4 { margin: 0; font-size: .95rem; overflow-wrap: anywhere; }
+.supplement-detail-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0 0; }
+.supplement-detail-facts > div:last-child { grid-column: 1 / -1; }
+.supplement-detail-facts dt { font-size: .65rem; text-transform: uppercase; letter-spacing: .05em; color: #74847b; }
+.supplement-detail-facts dd { margin: .3rem 0 0; font-size: .85rem; font-weight: 600; white-space: pre-wrap; }
+.supplement-muted { font-weight: 400; color: #74847b; }
+.supplement-notes { margin: 0; color: #637169; font-size: .85rem; line-height: 1.6; }
+.supplement-drawer-content > .detail-section { border-top: 1px solid #e1e9e4; padding: 1.25rem 0; }
+.supplement-assigned-clients ul { list-style: none; display: grid; gap: .5rem; margin: 0; padding: 0; }
+.supplement-assigned-clients li { display: grid; gap: .2rem; border: 1px solid #dce5e0; padding: .75rem; border-radius: 8px; font-size: .85rem; }
+.supplement-assigned-clients small { color: #74847b; overflow-wrap: anywhere; }
+.supplement-assignment .detail-empty { margin-bottom: 1rem; }
+@media (max-width: 1000px) { .supplement-row-fields { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .supplement-row-fields { grid-template-columns: 1fr; } }

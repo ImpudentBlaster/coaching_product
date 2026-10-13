@@ -20,6 +20,7 @@ const coachNavigation: NavGroup[] = [
     { label: 'Plans', to: '/coach/studio?tab=nutrition&section=plans', icon: '▤' },
     { label: 'Days', to: '/coach/studio?tab=nutrition&section=days', icon: '▦' },
     { label: 'Meals', to: '/coach/studio?tab=nutrition&section=meals', icon: '◒' },
+    { label: 'Supplements', to: '/coach/studio?tab=nutrition&section=supplements', icon: '▤' },
     { label: 'Foods', to: '/coach/studio?tab=nutrition&section=foods', icon: '⌁' },
   ] },
   { label: 'Training', icon: '◫', items: [
@@ -29,6 +30,7 @@ const coachNavigation: NavGroup[] = [
   ] },
   { label: 'Workspace', icon: '⚙', items: [
     { label: 'Invitations', to: '/coach?tab=invitations', icon: '＋' },
+    { label: 'Packages', to: '/coach/packages', icon: '◇' },
     { label: 'Settings', to: '/coach?tab=profile', icon: '⚙' },
   ] },
 ];

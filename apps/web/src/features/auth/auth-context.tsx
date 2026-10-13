@@ -8,7 +8,8 @@ type AuthContextValue = {
   ready: boolean;
   login(email: string, password: string): Promise<User>;
   updateProfile(displayName: string, businessName?: string): Promise<User>;
-  logout(): void;
+  logout(): Promise<void>;
+  switchToClient(clientId: string): Promise<User>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -30,6 +31,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [attempt]);
   const value = useMemo<AuthContextValue>(() => ({
     user, ready,
+    async switchToClient(clientId) {
+      const result = await apiRequest<{ accessToken: string; user: User }>(`/auth/switch-client/${clientId}`, { method: 'POST' });
+      setAccessToken(result.accessToken); setUser(result.user); return result.user;
+    },
     async login(email, password) {
       const result = await apiRequest<{ accessToken: string; user: User }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
       setAccessToken(result.accessToken); setUser(result.user); return result.user;
@@ -38,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await apiRequest<{ user: User }>('/auth/me', { method: 'PATCH', body: JSON.stringify({ displayName, businessName }) });
       setUser(result.user); return result.user;
     },
-    logout() { void apiRequest('/auth/logout', { method: 'POST' }).finally(() => { setAccessToken(null); setUser(null); }); },
+    async logout() { try { await apiRequest('/auth/logout', { method: 'POST' }); } finally { setAccessToken(null); setUser(null); } },
   }), [ready, user]);
   return <AuthContext.Provider value={value}>{ready ? children : restoreError ? <section className="card status-page"><p role="alert">{restoreError}</p><button className="primary" onClick={() => setAttempt(value => value + 1)}>Retry connection</button></section> : <p className="helper" role="status">Restoring your session…</p>}</AuthContext.Provider>;
 }

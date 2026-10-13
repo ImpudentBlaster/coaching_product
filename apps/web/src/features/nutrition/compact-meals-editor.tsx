@@ -1,3 +1,4 @@
+import { SelectControl } from '../../components/form-controls';
 import { useEffect, useId, useState, type Dispatch, type SetStateAction } from 'react';
 import { FoodSelect } from './food-select';
 import { NutritionTotals, type NutritionEntry, type NutritionNode } from './nutrition-details';
@@ -43,9 +44,9 @@ export function CompactMealsEditor({meals,setMeals,templates,foods,chooseFood,is
         </button><button type="button" className="danger icon-button" title="Remove meal" aria-label={`Remove meal ${meal.name||index+1}`} disabled={meals.length===1} onClick={()=>{setMeals(current=>current.filter(item=>item.key!==meal.key));if(active===meal.key)setActive(null);}}>×</button></div>
         {open&&<div className="builder-section-content" id={`${sectionId}-${meal.key}`}>
           <div className="form-row"><label>Meal name<input aria-label="Meal name" required maxLength={100} placeholder="e.g. Breakfast" value={meal.name} aria-invalid={!!issue?.name} aria-describedby={issue?.name?`${sectionId}-${meal.key}-name-error`:undefined} onChange={event=>updateMeal(meal.key,{name:event.target.value})}/>{issue?.name&&<small className="builder-field-error" id={`${sectionId}-${meal.key}-name-error`}>{issue.name}</small>}</label>
-          <label>Meal source<select value={meal.type} onChange={event=>{updateMeal(meal.key,{type:event.target.value as DayEntry['type']});setDraft(null);}}><option value="custom">Add foods</option><option value="meals">Use saved meal</option></select></label></div>
+          <label>Meal source<SelectControl aria-label="Meal source" value={meal.type} onChange={event=>{updateMeal(meal.key,{type:event.target.value as DayEntry['type']});setDraft(null);}}><option value="custom">Add foods</option><option value="meals">Use saved meal</option></SelectControl></label></div>
           {meal.type==='meals'?<>
-            <label>Meal template<select required value={meal.mealId} aria-invalid={!!issue?.source} onChange={event=>{const mealId=event.target.value;updateMeal(meal.key,{mealId,...(!meal.name?{name:templates.find(entry=>entry.id===mealId)?.data.name??''}:{})});}}><option value="">Choose meal</option>{meal.mealId&&!template&&<option value={meal.mealId} disabled>Unavailable meal — choose a replacement</option>}{templates.map(entry=><option key={entry.id} value={entry.id}>{entry.data.name}</option>)}</select>{issue?.source&&<small className="builder-field-error">{issue.source}</small>}</label>
+            <label>Meal template<SelectControl aria-label="Meal template" required value={meal.mealId} aria-invalid={!!issue?.source} onChange={event=>{const mealId=event.target.value;updateMeal(meal.key,{mealId,...(!meal.name?{name:templates.find(entry=>entry.id===mealId)?.data.name??''}:{})});}}><option value="">Choose meal</option>{meal.mealId&&!template&&<option value={meal.mealId} disabled>Unavailable meal — choose a replacement</option>}{templates.map(entry=><option key={entry.id} value={entry.id}>{entry.data.name}</option>)}</SelectControl>{issue?.source&&<small className="builder-field-error">{issue.source}</small>}</label>
             {template?.data.items?.length?<NutritionFoodList items={template.data.items}/>:<p className="builder-empty">Choose a saved meal to see its foods.</p>}
           </>:<>
             <h5 className="builder-section-title">Foods</h5>

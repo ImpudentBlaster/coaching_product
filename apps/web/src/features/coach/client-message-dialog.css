@@ -1,0 +1,12 @@
+.client-row-actions { align-items: center; }
+.client-row-actions .client-icon-action { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; min-height: 42px; padding: 0; }
+.client-icon-action svg { width: 20px; height: 20px; }
+.client-message-thread { display: grid; gap: var(--space-4); }
+.client-message-thread ol { display: grid; gap: var(--space-3); list-style: none; padding: 0; margin: 0; }
+.client-message-thread li { padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface-subtle); }
+.client-message-thread li.from-coach { background: #edf5ef; }
+.client-message-thread li header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.client-message-thread time { font-size: var(--font-helper); color: var(--color-muted); }
+.client-message-thread li p { white-space: pre-wrap; overflow-wrap: anywhere; margin: var(--space-2) 0 0; font-size: var(--font-body); line-height: 1.6; }
+.client-message-thread form { display: grid; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
+.client-message-thread form button { justify-self: start; }

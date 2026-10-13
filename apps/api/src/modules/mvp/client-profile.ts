@@ -10,8 +10,9 @@ export function createClientProfileRouter(pool: Pool): Router {
       SELECT json_build_object(
         'client',json_build_object('id',u.id,'displayName',cp.display_name,'email',u.email,'status',cc.status,'joinedAt',cc.created_at,'phone',setup.data->>'phone'),
         'onboarding',(SELECT json_build_object('status',o.status,'data',COALESCE(o.submitted_snapshot,o.data)) FROM onboarding_submissions o WHERE o.coach_id=$1 AND o.client_id=$2),
-        'program',(SELECT json_build_object('id',p.id,'snapshot',p.snapshot,'assignedAt',p.assigned_at) FROM program_assignments p WHERE p.coach_id=$1 AND p.client_id=$2 AND p.active ORDER BY p.assigned_at DESC LIMIT 1),
-        'nutrition',(SELECT json_build_object('snapshot',n.snapshot,'assignedAt',n.assigned_at) FROM nutrition_plan_assignments n WHERE n.coach_id=$1 AND n.client_id=$2 AND n.active ORDER BY n.assigned_at DESC LIMIT 1),
+        'program',(SELECT json_build_object('id',p.id,'programId',p.program_id,'snapshot',p.snapshot,'assignedAt',p.assigned_at) FROM program_assignments p WHERE p.coach_id=$1 AND p.client_id=$2 AND p.active ORDER BY p.assigned_at DESC LIMIT 1),
+        'nutrition',(SELECT json_build_object('planId',n.plan_id,'snapshot',n.snapshot,'assignedAt',n.assigned_at) FROM nutrition_plan_assignments n WHERE n.coach_id=$1 AND n.client_id=$2 AND n.active ORDER BY n.assigned_at DESC LIMIT 1),
+        'supplements',(SELECT json_build_object('planId',n.plan_id,'snapshot',n.snapshot,'assignedAt',n.assigned_at) FROM supplement_plan_assignments n WHERE n.coach_id=$1 AND n.client_id=$2 AND n.active ORDER BY n.assigned_at DESC LIMIT 1),
         'subscription',(SELECT to_jsonb(s) - 'coach_id' - 'client_id' FROM subscriptions s WHERE s.coach_id=$1 AND s.client_id=$2),
         'progress',COALESCE((SELECT json_agg(p ORDER BY p.measurement_date DESC) FROM (SELECT measurement_date::text,body_weight,waist,chest,arm,notes FROM progress_entries WHERE client_id=$2 ORDER BY measurement_date DESC LIMIT 90) p),'[]'::json),
         'workouts',COALESCE((SELECT json_agg(w ORDER BY w."startedAt" DESC) FROM (SELECT id,workout_snapshot->>'name' name,status,started_at "startedAt",completed_at "completedAt" FROM workout_sessions WHERE coach_id=$1 AND client_id=$2 ORDER BY started_at DESC LIMIT 10) w),'[]'::json),

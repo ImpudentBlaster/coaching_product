@@ -1,3 +1,4 @@
+import { formatDateTime } from '../../lib/dates';
 import { Notice } from '../../components/editor-dialog';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
@@ -14,7 +15,7 @@ type Filter = 'all' | 'mine' | 'photos' | 'files';
 const filters: { value: Filter; label: string }[] = [{ value: 'all', label: 'All posts' }, { value: 'photos', label: 'Photos' }, { value: 'files', label: 'Files' }, { value: 'mine', label: 'My posts' }];
 const message = (error: unknown) => error instanceof Error ? error.message : 'Something went wrong. Please try again.';
 const formatSize = (size: number) => size < 1024 * 1024 ? `${Math.ceil(size / 1024)} KB` : `${(size / (1024 * 1024)).toFixed(1)} MB`;
-function timestamp(value: string) { return new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+function timestamp(value: string) { return formatDateTime(value); }
 function encode(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

@@ -7,6 +7,8 @@ import { authenticate, issueAccessToken, requireRole, type AuthenticatedRequest 
 import { DemoIdentityStore, toPublicUser } from './demo-store.js';
 import { PostgresIdentityStore } from './postgres-store.js';
 import type { ApprovalStatus } from './types.js';
+import { ClientAccess, ClientAccessError } from './client-access.js';
+import { ClientMailer } from './mailer.js';
 
 const coachRegistrationSchema = z.object({
   email: z.string().email(), password: z.string().min(12).max(128),
@@ -22,7 +24,9 @@ const profileSchema = z.object({ displayName: z.string().trim().min(2).max(100),
 type IdentityStore = DemoIdentityStore | PostgresIdentityStore;
 export function createIdentityRouter(environment: Environment, store: IdentityStore): Router {
   const router = Router();
-  const jwtAuth = authenticate(environment);
+  const mailer = new ClientMailer(environment);
+  const clientAccess = store instanceof PostgresIdentityStore ? new ClientAccess(store.pool) : null;
+  const jwtAuth = authenticate(environment, store instanceof PostgresIdentityStore ? store.pool : undefined);
   const auth = (request: AuthenticatedRequest, response: Response, next: NextFunction): void => {
     jwtAuth(request, response, () => {
       void (async () => {
@@ -52,14 +56,15 @@ export function createIdentityRouter(environment: Environment, store: IdentitySt
     if (!parsed.success) return response.status(401).json({ code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' });
     const user = await store.findByEmail(parsed.data.email);
     if (!user || !(await argon2.verify(user.passwordHash, parsed.data.password))) return response.status(401).json({ code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' });
+    if (user.role === 'CLIENT' && ['SUSPENDED','REJECTED'].includes(user.approvalStatus)) return response.status(403).json({ message: 'This client account is no longer available. Contact your coach.' });
     const refresh = await store.createRefreshSession(user.id); setRefreshCookie(response, refresh.token, environment);
-    return response.json({ accessToken: issueAccessToken(environment, user), user: toPublicUser(user) });
+    return response.json({ accessToken: issueAccessToken(environment, { ...user, sessionFamilyId: refresh.session.familyId }), user: toPublicUser(user) });
   });
 
   router.post('/auth/refresh', async (request, response) => {
     const token = getRefreshCookie(request);
     if (!token) return response.status(401).json({ code: 'UNAUTHENTICATED', message: 'Authentication required' });
-    try { const rotated = await store.rotateRefreshSession(token); setRefreshCookie(response, rotated.token, environment); return response.json({ accessToken: issueAccessToken(environment, rotated.user), user: toPublicUser(rotated.user) }); }
+    try { const rotated = await store.rotateRefreshSession(token); setRefreshCookie(response, rotated.token, environment); return response.json({ accessToken: issueAccessToken(environment, { ...rotated.user, sessionFamilyId: 'familyId' in rotated ? String(rotated.familyId) : undefined }), user: toPublicUser(rotated.user) }); }
     catch (error) {
       if (!(error instanceof Error) || !['INVALID_REFRESH', 'REFRESH_REUSE'].includes(error.message)) throw error;
       clearRefreshCookie(response, environment); return response.status(401).json({ code: 'UNAUTHENTICATED', message: 'Authentication required' });
@@ -72,7 +77,7 @@ export function createIdentityRouter(environment: Environment, store: IdentitySt
   router.post('/auth/password-reset', authLimiter, async (request, response) => {
     const parsed = passwordResetSchema.safeParse(request.body); if (!parsed.success) return response.status(400).json({ code: 'VALIDATION_ERROR', message: 'Check the submitted fields' });
     try { await store.usePasswordReset(parsed.data.token, parsed.data.newPassword); clearRefreshCookie(response, environment); return response.status(204).send(); }
-    catch { return response.status(410).json({ code: 'INVALID_RESET', message: 'This reset code is invalid, expired, or already used' }); }
+    catch (error) { if (error instanceof Error && error.message === 'INVALID_RESET') return response.status(410).json({ code: 'INVALID_RESET', message: 'This reset code is invalid, expired, or already used' }); throw error; }
   });
 
   router.post('/auth/client/invitation', authLimiter, async (request,response)=>{
@@ -144,7 +149,8 @@ export function createIdentityRouter(environment: Environment, store: IdentitySt
     if (!parsed.success) return response.status(400).json({ code: 'VALIDATION_ERROR', message: 'Enter a valid client email' });
     try {
       const invitation = await store.createClientInvitation(request.auth?.userId ?? '', parsed.data.email);
-      return response.status(201).json({ invitation });
+      const delivery = await mailer.send(parsed.data.email, 'registration', invitation.token);
+      return response.status(201).json({ invitation, delivery });
     } catch (error) {
       if (error instanceof Error && error.message === 'COACH_NOT_APPROVED') return response.status(403).json({ code: 'COACH_NOT_APPROVED', message: 'Coach approval is required' });
       throw error;
@@ -169,6 +175,45 @@ export function createIdentityRouter(environment: Environment, store: IdentitySt
   });
 
   router.get('/client/workspace', auth, requireRole('CLIENT'), async (request: AuthenticatedRequest, response) => response.json(await store.getClientWorkspace(request.auth?.userId ?? '')));
+
+  router.post('/auth/switch-client/:clientId', authLimiter, auth, requireRole('COACH'), async (request, response) => {
+    if (!clientAccess) return response.status(503).json({ message: 'Client switching requires PostgreSQL mode.' });
+    const clientId = z.string().uuid().parse(request.params.clientId);
+    const switched = await clientAccess.switchClient(request.auth!.userId, clientId, getRefreshCookie(request) ?? '');
+    const user = await store.findById(clientId);
+    if (!user) throw new Error('Client not found after switch');
+    setRefreshCookie(response, switched.token, environment);
+    response.set('Cache-Control', 'no-store');
+    return response.json({ accessToken: issueAccessToken(environment, { ...user, sessionFamilyId: switched.familyId }), user: toPublicUser(user) });
+  });
+  router.delete('/coach/clients/:clientId', auth, requireRole('COACH'), async (request, response) => {
+    if (!clientAccess) return response.status(503).json({ message: 'Client deletion requires PostgreSQL mode.' });
+    await clientAccess.remove(request.auth!.userId, z.string().uuid().parse(request.params.clientId));
+    return response.status(204).send();
+  });
+  router.post('/coach/clients/:clientId/password-reset', authLimiter, auth, requireRole('COACH'), async (request, response) => {
+    if (!clientAccess || !environment.SMTP_HOST || !environment.MAIL_FROM) return response.status(503).json({ message: 'Configure SMTP and MAIL_FROM before sending password reset emails.' });
+    const reset = await clientAccess.reset(request.auth!.userId, z.string().uuid().parse(request.params.clientId));
+    const delivery = await mailer.send(reset.email, 'reset', reset.token);
+    return response.status(delivery.status === 'sent' ? 200 : 502).json({ delivery, message: delivery.status === 'sent' ? 'Password reset email sent.' : 'Email could not be sent. Please retry.' });
+  });
+  router.post('/coach/clients/:clientId/registration-mail', authLimiter, auth, requireRole('COACH'), async (request, response) => {
+    if (!clientAccess || !environment.SMTP_HOST || !environment.MAIL_FROM) return response.status(503).json({ message: 'Configure SMTP and MAIL_FROM before sending registration emails.' });
+    const client = await clientAccess.resendRegistered(request.auth!.userId, z.string().uuid().parse(request.params.clientId));
+    const delivery = await mailer.send(client.email, 'welcome');
+    return response.status(delivery.status === 'sent' ? 200 : 502).json({ delivery, message: delivery.status === 'sent' ? 'Registration reminder sent.' : 'Email could not be sent. Please retry.' });
+  });
+  router.post('/coach/invitations/:invitationId/registration-mail', authLimiter, auth, requireRole('COACH'), async (request, response) => {
+    if (!clientAccess || !environment.SMTP_HOST || !environment.MAIL_FROM) return response.status(503).json({ message: 'Configure SMTP and MAIL_FROM before sending registration emails.' });
+    const invitation = await clientAccess.resendInvitation(request.auth!.userId, z.string().uuid().parse(request.params.invitationId));
+    const delivery = await mailer.send(invitation.email, 'registration', invitation.token);
+    return response.status(delivery.status === 'sent' ? 200 : 502).json({ delivery, message: delivery.status === 'sent' ? 'Registration email sent. Earlier registration links are now invalid.' : 'Email could not be sent. Please retry.' });
+  });
+  router.use((error: unknown, _request: AuthenticatedRequest, response: Response, next: NextFunction) => {
+    if (error instanceof ClientAccessError) { response.status(error.status).json({ message: error.message }); return; }
+    if (error instanceof z.ZodError) { response.status(400).json({ message: 'Check the submitted fields.' }); return; }
+    next(error);
+  });
 
   return router;
 }

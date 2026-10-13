@@ -5,7 +5,7 @@ Use **Add client** on the coach dashboard, **Edit client** beside an approved or
 All three use a four-step wizard:
 
 1. Personal information: first/last name, email, birth date, phone and preferred weight unit.
-2. Assign plan: optional informational membership, nutrition plan, published workout program and exercise-unit preference.
+2. Assign plan: choose individual plans manually or select a saved package to copy its membership, nutrition plan, published workout program and check-in schedule. Review and adjust the copied details before saving.
 3. Assign form: check-in form, first date, frequency, occurrence count and optional weekdays for weekly/fortnightly schedules. The initial questionnaire remains the standard client onboarding form.
 4. Review and submit: inspect selections and return to earlier steps before saving.
 
@@ -16,6 +16,18 @@ Opening the invitation loads the invited email and prepared name. The client onl
 Updating a registered client preloads their setup and current active plan assignments. The account email is read-only. Updates use a revision to reject stale edits. Changing a plan replaces its active assignment while retaining history. Choosing no membership cancels the current record. Changing check-in settings adds missing dates without deleting existing assignments, drafts, photos or submissions; overlapping dates for the same form are retained rather than duplicated. Unchanged settings do not reassign plans or generate more check-ins.
 
 The unit choices are stored preferences for the client record, not automatic conversions of existing measurements or form fields. Welcome-pack uploads, supplement plans, separate customizable initial questionnaires/daily-habit forms, full-library access controls, and Apple Pay are not part of this implementation. Daily check-ins are available through the check-in schedule.
+
+## Coaching packages
+
+Open **Workspace → Packages** to create, edit, archive or restore reusable packages. Each package includes a name, description, optional workout program, nutrition plan and check-in schedule. The initial questionnaire remains standard client onboarding. Price, currency, payment type and duration/renewal interval are informational manual records; no payments are collected.
+
+Selecting a package in the client wizard replaces its current membership, workout, nutrition and check-in selections, using today as the start date. The details remain individually editable. Selecting the manual option retains the copied selections for adjustment. Saving a client or invitation persists those selections independently; subsequent package edits or archiving do not change existing client setups or invitations. Archived packages cannot be newly selected.
+
+`011_coaching_packages.sql` adds coach-owned packages with revision checks. Apply migrations through `pnpm --filter @coaching/api db:migrate` after building the API. `/api/v1/coach/packages` supports GET/POST and PUT `/:id` for approved coaches. Writes validate coach ownership of selected plans and forms, and save audit events in the same transaction.
+
+`012_client_package_assignment.sql` records the selected package on client setup with a coach-scoped foreign key. The Packages table counts registered approved or pending-review clients currently assigned to each package; unused invitations are excluded. Selecting manual plans clears the package link while retaining the copied plan details. Earlier setups without a package link require reselecting their package once; names alone are not used to infer assignments.
+
+Click an assigned-client count or open package details to see the assigned-client list. Search by name or email and open a client's profile from their name. The coach-owned `GET /api/v1/coach/packages/:id/clients` endpoint returns pages of 20 clients with the same inclusion rules as the count, including archived packages with existing clients.
 
 ## Storage and validation
 

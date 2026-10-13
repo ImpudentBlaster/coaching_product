@@ -1,4 +1,5 @@
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { SuggestionControl } from '../../components/form-controls';
 import { apiRequest, type Exercise } from '../../lib/api';
 import { Notice } from '../../components/editor-dialog';
 import { LoadingImage } from '../../components/loading-image';
@@ -13,7 +14,6 @@ function readGif(file: File): Promise<string> {
   });
 }
 export function ExerciseForm({ onSaved, onBusy }: { onSaved: (exercise: Exercise) => void; onBusy: (busy: boolean) => void }) {
-  const id = useId();
   const [filters, setFilters] = useState<Filters>({ bodyParts: [], equipment: [], targets: [] });
   const [steps, setSteps] = useState(['']);
   const [gif, setGif] = useState<File | null>(null);
@@ -38,10 +38,9 @@ export function ExerciseForm({ onSaved, onBusy }: { onSaved: (exercise: Exercise
     <Notice message={error} error onClear={() => setError('')} />
     <fieldset disabled={saving} className="vertical">
       <label>Exercise name<input name="name" required minLength={2} maxLength={180} placeholder="e.g. Seated dumbbell press" /></label>
-      <div className="form-row"><label>Body part<input name="bodyPart" list={`${id}-body`} required maxLength={100} placeholder="e.g. shoulders" /></label><label>Equipment<input name="equipment" list={`${id}-equipment`} required maxLength={100} placeholder="e.g. dumbbell" /></label></div>
-      <label>Target muscle<input name="target" list={`${id}-target`} required maxLength={100} placeholder="e.g. delts" /></label>
+      <div className="form-row"><label>Body part<SuggestionControl aria-label="Body part" name="bodyPart" options={filters.bodyParts} required maxLength={100} placeholder="e.g. shoulders" /></label><label>Equipment<SuggestionControl aria-label="Equipment" name="equipment" options={filters.equipment} required maxLength={100} placeholder="e.g. dumbbell" /></label></div>
+      <label>Target muscle<SuggestionControl aria-label="Target muscle" name="target" options={filters.targets} required maxLength={100} placeholder="e.g. delts" /></label>
       <label>Secondary muscles<input name="secondaryMuscles" maxLength={2020} placeholder="e.g. triceps, upper chest" /><small>Optional. Separate muscle names with commas (up to 20).</small></label>
-      <datalist id={`${id}-body`}>{filters.bodyParts.map(value => <option key={value} value={value} />)}</datalist><datalist id={`${id}-equipment`}>{filters.equipment.map(value => <option key={value} value={value} />)}</datalist><datalist id={`${id}-target`}>{filters.targets.map(value => <option key={value} value={value} />)}</datalist>
       <div className="vertical"><h3>Step-by-step instructions</h3>{steps.map((step, index) => <div className="exercise-instruction" key={index}><label>Step {index + 1}<textarea required maxLength={2000} value={step} onChange={event => setSteps(previous => previous.map((value, position) => position === index ? event.target.value : value))} /></label><button className="secondary" type="button" disabled={steps.length === 1} aria-label={`Remove step ${index + 1}`} onClick={() => setSteps(previous => previous.filter((_, position) => position !== index))}>Remove</button></div>)}<button className="secondary" type="button" disabled={steps.length >= 30} onClick={() => setSteps(previous => [...previous, ''])}>Add instruction step</button></div>
       <label>Animation (optional GIF)<input type="file" accept="image/gif,.gif" onChange={event => {
         const file = event.target.files?.[0]; setError('');
