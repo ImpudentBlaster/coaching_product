@@ -1,0 +1,26 @@
+import '@testing-library/jest-dom/vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { afterEach, expect, it, vi } from 'vitest';
+import { PasswordResetPage } from './password-reset-page';
+import { apiRequest } from '../../lib/api';
+const { logout } = vi.hoisted(() => ({ logout: vi.fn() }));
+vi.mock('../../lib/api', () => ({ apiRequest: vi.fn() }));
+vi.mock('./auth-context', () => ({ useAuth: () => ({ logout }) }));
+afterEach(() => { cleanup(); vi.resetAllMocks(); window.location.hash = ''; });
+it('uses the emailed reset link, keeps errors visible, and clears the old session after success', async () => {
+  window.location.hash = 'token=private-reset-token';
+  render(<MemoryRouter initialEntries={['/reset-password']}><Routes><Route path="/reset-password" element={<PasswordResetPage />} /><Route path="/login" element={<h1>Sign in</h1>} /></Routes></MemoryRouter>);
+  expect(screen.queryByLabelText('Reset code')).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'MyNewPassword!123' } });
+  vi.mocked(apiRequest).mockRejectedValueOnce(new Error('Link expired'));
+  fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
+  await screen.findByText('Link expired');
+  expect(logout).not.toHaveBeenCalled();
+  expect(screen.getByLabelText('New password')).toHaveValue('MyNewPassword!123');
+  vi.mocked(apiRequest).mockResolvedValueOnce(undefined); logout.mockResolvedValue(undefined);
+  fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
+  await screen.findByRole('heading', { name: 'Sign in' });
+  expect(apiRequest).toHaveBeenCalledWith('/auth/password-reset', { method: 'POST', body: JSON.stringify({ token: 'private-reset-token', newPassword: 'MyNewPassword!123' }) });
+  expect(logout).toHaveBeenCalledOnce();
+});

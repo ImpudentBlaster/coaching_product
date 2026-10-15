@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from '../../lib/dates';
 import { AssignedProgramClients } from './assigned-program-clients';
 import { ProgramWorkoutDetails } from './program-workout-details';
 import { ProgramAssignment } from './program-assignment';
@@ -11,7 +12,7 @@ function Icon({ kind }: { kind: 'edit' | 'delete' | 'view' }) {
 }
 function Timestamp({ value, withTime = false }: { value: string | undefined; withTime?: boolean }) {
   if (!value || Number.isNaN(Date.parse(value))) return <>—</>;
-  return <time dateTime={value} title={new Date(value).toLocaleString()}>{new Date(value).toLocaleString(undefined, { dateStyle: 'medium', ...(withTime ? { timeStyle: 'short' as const } : {}) })}</time>;
+  return <time dateTime={value} title={formatDateTime(value)}>{withTime ? formatDateTime(value) : formatDate(value)}</time>;
 }
 export function ProgramRow({ program, templates, onEdit, onSaved, onMessage, onAssignmentsChanged, disabled = false }: {
   onAssignmentsChanged?: () => Promise<void>; program: Program; clients: ClientRelationship[]; templates: WorkoutTemplate[]; onEdit: () => void; onSaved: () => Promise<void>; onMessage: (message: string) => void; disabled?: boolean;

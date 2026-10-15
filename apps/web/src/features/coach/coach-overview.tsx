@@ -1,7 +1,10 @@
+import { formatDate } from '../../lib/dates';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiRequest } from '../../lib/api';
 import { ClientWizard } from './client-wizard';
+import { DashboardLatest } from './dashboard-latest';
+import './coach-overview.css';
 
 export type CoachOverviewData = {
   activeClients: number; pendingClients: number; onboardingReviews: number;
@@ -9,13 +12,16 @@ export type CoachOverviewData = {
   onboarding: Array<{clientId:string;clientName:string;submittedAt:string}>;
   dueCheckins: Array<{id:string;clientId:string;clientName:string;dueDate:string}>;
   activity: Array<{id:string;clientId:string;clientName:string;kind:'WORKOUT'|'ONBOARDING'|'CHECKIN';title:string;happenedAt:string}>;
+  latestClients?: Array<{clientId:string;clientName:string;email:string;packageName:string|null;membershipStatus:string|null;joinedAt:string}>;
+  latestCheckins?: Array<{id:string;clientId:string;clientName:string;formName:string;dueDate:string;submittedAt:string;status:string}>;
+  latestMessages?: Array<{id:string;clientId:string;clientName:string;author:string;message:string;context:string;createdAt:string}>;
 };
 function localDate() {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
 function shortDate(value:string) {
-  return new Date(value.length===10?`${value}T12:00:00`:value).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  return formatDate(value);
 }
 
 export function CoachOverview({name}:{name:string}) {
@@ -45,8 +51,8 @@ export function CoachOverview({name}:{name:string}) {
           <Metric label="Check-ins to review" value={data.checkinReviews} detail="Submitted and awaiting feedback" to="/coach/studio?tab=checkins"/>
           <Metric label="Workouts completed" value={data.completedWorkouts7d} detail="In the last 7 days" to="/coach/studio?tab=activity"/>
         </div>
-        <div className="overview-columns">
-          <section className="card overview-panel" id="onboarding-reviews"><header><div><p className="eyebrow">Your next actions</p><h2>Needs your attention</h2></div><span className="overview-count">{data.pendingClients+data.onboardingReviews+data.checkinReviews}</span></header>
+        <div className="overview-priority">
+          <section className="card overview-panel overview-attention" id="onboarding-reviews"><header><div><p className="eyebrow">Your next actions</p><h2>Needs your attention</h2></div><span className="overview-count">{data.pendingClients+data.onboardingReviews+data.checkinReviews}</span></header>
             {data.pendingClients>0&&<Link className="overview-task" to="/coach?tab=clients"><span className="overview-task-icon" aria-hidden="true">＋</span><div><strong>{data.pendingClients} {data.pendingClients===1?'client needs':'clients need'} approval</strong><p>Review access before coaching begins.</p></div><span aria-hidden="true">→</span></Link>}
             {data.checkinReviews>0&&<Link className="overview-task" to="/coach/studio?tab=checkins"><span className="overview-task-icon" aria-hidden="true">✓</span><div><strong>{data.checkinReviews} check-in{data.checkinReviews===1?'':'s'} ready for review</strong><p>Read their updates and share feedback.</p></div><span aria-hidden="true">→</span></Link>}
             {data.onboarding.map(item=><div className="overview-task" key={item.clientId}><span className="overview-task-icon" aria-hidden="true">{item.clientName.charAt(0)}</span><div><strong>{item.clientName}</strong><p>Onboarding submitted {shortDate(item.submittedAt)}</p></div><Link className="secondary" aria-label={`Review onboarding for ${item.clientName}`} to={`/coach/clients/${item.clientId}?tab=questionnaire`}>Review</Link></div>)}
@@ -55,9 +61,10 @@ export function CoachOverview({name}:{name:string}) {
           </section>
           <section className="card overview-panel"><header><div><p className="eyebrow">Client follow-through</p><h2>Due check-ins</h2></div><Link to="/coach/studio?tab=checkins">Manage →</Link></header>
             <div className="overview-due-totals"><div><strong>{data.dueToday}</strong><span>Due today</span></div><div><strong>{data.overdue}</strong><span>Overdue</span></div></div>
-            {data.dueCheckins.length===0?<div className="overview-empty"><h3>No check-ins outstanding</h3><p>Unsubmitted check-ins will appear here when they’re due.</p></div>:<><p className="overview-note">Awaiting client submission · oldest first</p>{data.dueCheckins.map(item=><div className="overview-task" key={item.id}><div><strong>{item.clientName}</strong><p>Due {shortDate(item.dueDate)}</p></div><span className={`overview-due-tag ${item.dueDate<today?'late':''}`}>{item.dueDate<today?'Overdue':'Today'}</span></div>)}{data.dueToday+data.overdue>data.dueCheckins.length&&<p className="overview-note">Showing 5 of {data.dueToday+data.overdue} outstanding check-ins.</p>}</>}
+            <details className="overview-outstanding"><summary>View outstanding check-ins<span className="overview-count">{data.dueToday+data.overdue}</span></summary><div className="overview-outstanding-list">{data.dueCheckins.length===0?<div className="overview-empty"><h3>No check-ins outstanding</h3><p>Unsubmitted check-ins will appear here when they’re due.</p></div>:<><p className="overview-note">Awaiting client submission · oldest first</p>{data.dueCheckins.map(item=><div className="overview-task" key={item.id}><div><strong>{item.clientName}</strong><p>Due {shortDate(item.dueDate)}</p></div><span className={`overview-due-tag ${item.dueDate<today?'late':''}`}>{item.dueDate<today?'Overdue':'Today'}</span></div>)}{data.dueToday+data.overdue>data.dueCheckins.length&&<p className="overview-note">Showing 5 of {data.dueToday+data.overdue} outstanding check-ins.</p>}</>}</div></details>
           </section>
         </div>
+        <DashboardLatest data={data}/>
         <section className="card overview-panel overview-activity"><header><div><p className="eyebrow">Across your clients</p><h2>Recent activity</h2></div><Link to="/coach/studio?tab=activity">Workout history →</Link></header>
           {data.activity.length===0?<div className="overview-empty"><h3>Your clients’ activity starts here</h3><p>Completed workouts and submitted questionnaires or check-ins will appear as clients get started.</p></div>:data.activity.map(item=><div className="overview-task" key={item.id}><span className="overview-task-icon" aria-hidden="true">{item.kind==='WORKOUT'?'↗':'✓'}</span><div><strong>{item.clientName}</strong><p>{item.kind==='WORKOUT'?'Completed': 'Submitted'} · {item.title}</p></div><time dateTime={item.happenedAt}>{shortDate(item.happenedAt)}</time></div>)}
         </section>

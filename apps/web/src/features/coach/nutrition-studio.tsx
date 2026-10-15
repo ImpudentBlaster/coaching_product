@@ -1,3 +1,6 @@
+import { SupplementStudio } from './supplement-studio';
+import { formatDate, formatDateTime } from '../../lib/dates';
+import { SelectControl } from '../../components/form-controls';
 import { PlanBuilder } from '../nutrition/plan-builder';
 import { PlanDetails } from '../nutrition/plan-details';
 import { DayBuilder } from '../nutrition/day-builder';
@@ -89,10 +92,11 @@ export function NutritionStudio({ clients }: { clients: ClientRelationship[] }) 
   }
   return <div className="nutrition-studio">
 
-    <p className="lede">Plans → Days → Meals → Foods. Build your food library, combine foods into meals, and assemble days into a client plan.</p>
+    {section !== 'supplements' && <p className="lede">Plans → Days → Meals → Foods. Build your food library, combine foods into meals, and assemble days into a client plan.</p>}
 
-    <nav className="nutrition-mobile-categories" aria-label="Nutrition categories">{(['plans', 'days', 'meals', 'foods'] as const).map(tab => <Link key={tab} aria-current={kind === tab ? 'page' : undefined} className={kind === tab ? 'primary' : 'secondary'} to={`/coach/studio?tab=nutrition&section=${tab}`}>{tab[0]!.toUpperCase() + tab.slice(1)}</Link>)}</nav>
+    <nav className="nutrition-mobile-categories" aria-label="Nutrition categories">{(['plans', 'days', 'meals', 'foods', 'supplements'] as const).map(tab => <Link key={tab} aria-current={(section === 'supplements' ? 'supplements' : kind) === tab ? 'page' : undefined} className={(section === 'supplements' ? 'supplements' : kind) === tab ? 'primary' : 'secondary'} to={`/coach/studio?tab=nutrition&section=${tab}`}>{tab[0]!.toUpperCase() + tab.slice(1)}</Link>)}</nav>
 
+    {section === 'supplements' ? <SupplementStudio clients={clients}/> : <>
     {deletingEntry&&<EditorDialog title={'Delete '+labels[deletingEntry.data.kind]+'?'} variant="confirmation" busy={!!removing} trackChanges={false} onClose={()=>setDeletingEntry(null)}>
       <p>Delete <strong>{deletingEntry.data.name}</strong> from your nutrition library? Existing client plans will be preserved.</p>
       <div className="workout-confirm-actions"><button type="button" className="secondary" disabled={!!removing} onClick={()=>setDeletingEntry(null)}>Cancel</button><button type="button" className="danger" disabled={!!removing} onClick={()=>void remove(deletingEntry)}>{removing?'Deleting…':'Delete '+labels[deletingEntry.data.kind]}</button></div>
@@ -108,15 +112,16 @@ export function NutritionStudio({ clients }: { clients: ClientRelationship[] }) 
     <Collection key={kind} {...(kind === 'foods' ? {columns:foodTableColumns} : kind==='plans'?{columns:['Name','Days','Assigned clients','Created at','Updated at','Action','View']}:(kind==='meals'||kind==='days')?{columns:['Name',kind==='days'?'Entries':'Foods','Macronutrients','Calories','Created at','Updated at','Action','View']}: {})} title={`Nutrition ${kind}`} loading={loading} error={loadError} onRetry={()=>void load()} actions={<div className="actions">{kind==='foods'&&<button className="secondary" onClick={()=>setBrowsingStarters(true)}>Add From Library</button>}<button className="primary" onClick={()=>setEditing(null)}>{kind==='foods'?'Create Food':`Add ${labels[kind]}`}</button></div>}>
 
       {library.entries.filter(entry=>entry.data.kind===kind).sort((a,b)=>kind==='foods'?Number(catalogIds.includes(a.id))-Number(catalogIds.includes(b.id)):0).map(entry => kind === 'foods' || kind === 'meals' || kind === 'days'
-        ? <tr key={entry.id} data-search={`${entry.data.name} ${entry.data.notes} ${new Date(entry.createdAt).toLocaleDateString()}`}><FoodTableCells food={entry.data} {...((kind==='meals'||kind==='days')?{weight:entry.data.items?.length??0,metadataCells:<>{[entry.createdAt,entry.updatedAt].map((value,index)=><td className="nutrition-timestamp" key={index}>{value?<time dateTime={value}>{new Date(value).toLocaleString()}</time>:'—'}</td>)}</>}:{})} actions={<ActionMenu name={entry.data.name} disabled={!!removing} items={[{label:'Edit',onSelect:()=>setEditing(entry)},{label:'Delete',danger:true,onSelect:()=>setDeletingEntry(entry)}]}/>}></FoodTableCells>{(kind==='meals'||kind==='days')&&<td className="workout-view-cell"><button type="button" className="secondary icon-button workout-icon-action" title={'View '+labels[kind]} aria-label={'View '+entry.data.name} disabled={!!removing} onClick={()=>kind==='days'?setViewingDay(entry):setViewingMeal(entry)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></td>}</tr>
+        ? <tr key={entry.id} data-search={`${entry.data.name} ${entry.data.notes} ${formatDate(entry.createdAt)}`}><FoodTableCells food={entry.data} {...((kind==='meals'||kind==='days')?{weight:entry.data.items?.length??0,metadataCells:<>{[entry.createdAt,entry.updatedAt].map((value,index)=><td className="nutrition-timestamp" key={index}>{value?<time dateTime={value}>{formatDateTime(value)}</time>:'—'}</td>)}</>}:{})} actions={<ActionMenu name={entry.data.name} disabled={!!removing} items={[{label:'Edit',onSelect:()=>setEditing(entry)},{label:'Delete',danger:true,onSelect:()=>setDeletingEntry(entry)}]}/>}></FoodTableCells>{(kind==='meals'||kind==='days')&&<td className="workout-view-cell"><button type="button" className="secondary icon-button workout-icon-action" title={'View '+labels[kind]} aria-label={'View '+entry.data.name} disabled={!!removing} onClick={()=>kind==='days'?setViewingDay(entry):setViewingMeal(entry)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></td>}</tr>
         : <tr key={entry.id} data-search={entry.data.name+' '+entry.data.notes}>
             <td className="food-name"><strong>{entry.data.name}</strong></td><td>{entry.data.items?.length??0}</td><td>{library.assignments.filter(assignment=>assignment.planId===entry.id).length}</td>
-            {[entry.createdAt,entry.updatedAt].map((value,index)=><td className="nutrition-timestamp" key={index}>{value?<time dateTime={value}>{new Date(value).toLocaleString()}</time>:'—'}</td>)}
+            {[entry.createdAt,entry.updatedAt].map((value,index)=><td className="nutrition-timestamp" key={index}>{value?<time dateTime={value}>{formatDateTime(value)}</time>:'—'}</td>)}
             <td className="food-actions"><ActionMenu name={entry.data.name} disabled={!!removing} items={[{label:'Edit',onSelect:()=>setEditing(entry)},{label:'Delete',danger:true,onSelect:()=>setDeletingEntry(entry)}]}/></td>
             <td className="workout-view-cell"><button type="button" className="secondary icon-button workout-icon-action" title="View plan" aria-label={'View '+entry.data.name} onClick={()=>setViewingPlan(entry)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></td>
           </tr>)}
     </Collection>
 
+  </>}
   </div>;
 
 }
@@ -218,7 +223,7 @@ function NutritionBuilder({ kind, entries, onSaved, onMessage, onNavigate, initi
 
         <p>Enter nutrition for the serving below. Meal quantities use this same unit.</p>
 
-        <div className="form-row"><label>Serving size<input name="servingSize" type="number" min="0.01" max="10000" step="any" defaultValue={initial?.data.servingSize??100} required/></label><label>Unit<select name="unit" defaultValue={initial?.data.unit??'g'}><option value="g">Grams (g)</option><option value="ml">Millilitres (ml)</option><option value="piece">Pieces</option></select></label></div>
+        <div className="form-row"><label>Serving size<input name="servingSize" type="number" min="0.01" max="10000" step="any" defaultValue={initial?.data.servingSize??100} required/></label><label>Unit<SelectControl aria-label="Unit" name="unit" defaultValue={initial?.data.unit??'g'}><option value="g">Grams (g)</option><option value="ml">Millilitres (ml)</option><option value="piece">Pieces</option></SelectControl></label></div>
 
         <div className="form-row">{(['calories', 'protein', 'carbs', 'fat'] as const).map(key => <label key={key}>{key === 'calories' ? 'Calories (kcal)' : `${key[0]!.toUpperCase() + key.slice(1)} (g)`}<input name={key} defaultValue={initial?.data.nutrients?.[key]} type="number" min="0" max="100000" step="any" required/></label>)}</div>
 
@@ -234,9 +239,9 @@ function NutritionBuilder({ kind, entries, onSaved, onMessage, onNavigate, initi
           const selected = rowOptions.find(entry => entry.id === row.id);
 
           return <fieldset className="nutrition-fields" key={row.key}><legend>{kind==='days'?'Entry':labels[childKind!]} {index + 1}</legend>
-            {kind==='days'&&<label>Entry type<select value={row.type} onChange={event=>{const type=event.target.value;setRows(current=>current.map(item=>item.key===row.key?{...item,type,id:'',quantity:'100'}:item));}}><option value="meals">Meal</option><option value="foods">Food</option></select></label>}
+            {kind==='days'&&<label>Entry type<SelectControl aria-label="Entry type" value={row.type} onChange={event=>{const type=event.target.value;setRows(current=>current.map(item=>item.key===row.key?{...item,type,id:'',quantity:'100'}:item));}}><option value="meals">Meal</option><option value="foods">Food</option></SelectControl></label>}
 
-            {(kind === 'meals'||(kind==='days'&&row.type==='foods')) ? <FoodSelect index={index+1} options={rowOptions} value={row.id} onSelect={id=>void chooseFood(row.key,id)}/> : <label>{labels[childKind!]}<select value={row.id} required onChange={event=>updateSelection(row.key,event.target.value,100)}><option value="">Choose {labels[childKind!]}</option>{row.id&&!selected&&<option value={row.id} disabled>Unavailable entry — choose a replacement</option>}{rowOptions.map(entry=><option value={entry.id} key={entry.id}>{entry.data.name}</option>)}</select></label>}
+            {(kind === 'meals'||(kind==='days'&&row.type==='foods')) ? <FoodSelect index={index+1} options={rowOptions} value={row.id} onSelect={id=>void chooseFood(row.key,id)}/> : <label>{labels[childKind!]}<SelectControl aria-label={labels[childKind!]} value={row.id} required onChange={event=>updateSelection(row.key,event.target.value,100)}><option value="">Choose {labels[childKind!]}</option>{row.id&&!selected&&<option value={row.id} disabled>Unavailable entry — choose a replacement</option>}{rowOptions.map(entry=><option value={entry.id} key={entry.id}>{entry.data.name}</option>)}</SelectControl></label>}
 
             {(kind === 'meals'||(kind==='days'&&row.type==='foods')) ? <label>Quantity ({selected?.data.unit ?? 'food unit'})<input type="number" min="0.01" max="10000" step="any" required value={row.quantity} onChange={event => { const quantity = event.target.value; setRows(current => current.map(item => item.key === row.key ? { ...item, quantity } : item)); }}/></label> : <label>{kind === 'days' ? 'Meal label (e.g. Breakfast)' : 'Day label (e.g. Day 1 / Training day)'}<input required maxLength={100} pattern=".*\S.*" value={row.label} onChange={event => { const label = event.target.value; setRows(current => current.map(item => item.key === row.key ? { ...item, label } : item)); }}/></label>}
 

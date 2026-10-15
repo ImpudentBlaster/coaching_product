@@ -1,0 +1,38 @@
+.form-control { min-width: 0; width: 100%; }
+.picker-trigger { display: flex; align-items: center; justify-content: space-between; gap: .6rem; width: 100%; min-height: 44px; box-sizing: border-box; padding: .85rem var(--space-4, 1rem); border: 1px solid #cedbd4; border-radius: var(--radius-control, 8px); background: #fbfdfc; color: inherit; font: inherit; text-align: left; }
+.picker-trigger[data-focus-visible], .picker-trigger[data-focus-within] { outline: 2px solid #087957; outline-offset: 2px; }
+.picker-trigger[data-disabled], fieldset:disabled .picker-trigger { opacity: .55; }
+.picker-popover { z-index: 1000; min-width: var(--trigger-width); max-width: min(90vw, 420px); border: 1px solid #cbd5d1; border-radius: 10px; background: white; color: #18382c; box-shadow: 0 10px 32px #173b2926; padding: .4rem; }
+.picker-calendar-popover { width: 296px; min-width: 0; max-width: calc(100vw - 24px); box-sizing: border-box; }
+.picker-calendar-popover table { width: 100%; table-layout: fixed; }
+.picker-calendar-popover .picker-day { width: 100%; height: 40px; }
+.picker-options { max-height: 280px; overflow: auto; outline: none; }
+/* Native dialogs own the top layer. Keep their portalled pickers outside the
+   scrolling body so menus can extend beyond a short assignment dialog. */
+.editor-dialog[open] { display: flex; flex-direction: column; overflow: visible; }
+.editor-dialog[open] > header, .editor-dialog[open] > .editor-footer { flex-shrink: 0; }
+.editor-dialog[open] > .editor-body { min-height: 0; overflow: auto; }
+.editor-dialog[open] > .picker-popover .picker-options { max-height: min(280px, var(--available-height, 280px)); }
+.picker-option { padding: .6rem .75rem; border-radius: 6px; cursor: pointer; }
+.picker-option[data-focused], .picker-day[data-focused] { background: #e6f4ed; outline: 2px solid #087957; outline-offset: -2px; }
+.picker-option[data-selected], .picker-day[data-selected] { background: #087957; color: white; }
+.picker-option[data-disabled], .picker-day[data-disabled] { opacity: .45; cursor: default; }
+.picker-date-input { display: flex; }
+.picker-segment { padding: 0 2px; border-radius: 3px; }
+.picker-segment[data-focused] { background: #087957; color: white; outline: none; }
+.picker-segment[data-placeholder] { color: #687b71; }
+.picker-calendar-button { padding: 0 .3rem; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.picker-calendar-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .3rem; }
+.picker-calendar-header h2 { font-size: 1rem; }
+.picker-calendar-header button { border: 0; border-radius: 6px; padding: .3rem .65rem; background: #e6f4ed; }
+.picker-day { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 6px; cursor: pointer; }
+.picker-day[data-outside-month] { color: #687b71; }
+.picker-error { color: #a32b2b; font-size: .85rem; }
+.picker-suggestion { padding: 0; }
+.picker-suggestion input { border: 0; background: transparent; box-shadow: none; }
+.picker-suggestion button { flex-shrink: 0; border: 0; background: transparent; padding: .4rem .75rem; color: inherit; }
+.wizard-fields .picker-trigger { background: #f3f5f8; border-color: transparent; padding: 13px 15px; color: #30466b; }
+.wizard-fields .picker-trigger[data-focus-visible], .wizard-fields .picker-trigger[data-focus-within] { outline-color: #398bfb; }
+.collection-pagination .form-control { width: 90px; }
+.actions > .form-control, .collection-tools > .form-control { width: auto; min-width: 140px; }
+@media (max-width: 540px) { .picker-trigger { font-size: 16px; } }

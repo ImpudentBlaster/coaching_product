@@ -7,11 +7,12 @@ export function ActionMenu({ name, items, disabled = false }: { name: string; it
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const width = Math.min(items.some(item => item.label.length > 20) ? 230 : 170, window.innerWidth - 16);
   function close(restore = false) { setPosition(null); if (restore) trigger.current?.focus(); }
   function open() {
     const rect = trigger.current!.getBoundingClientRect();
     const height = items.length * 42 + 12;
-    setPosition({ top: Math.max(8, rect.bottom + height + 8 > window.innerHeight ? rect.top - height - 4 : rect.bottom + 4), left: Math.max(8, Math.min(rect.right - 170, window.innerWidth - 178)) });
+    setPosition({ top: Math.max(8, rect.bottom + height + 8 > window.innerHeight ? rect.top - height - 4 : rect.bottom + 4), left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)) });
   }
   useEffect(() => {
     if (!position) return;
@@ -28,7 +29,7 @@ export function ActionMenu({ name, items, disabled = false }: { name: string; it
       onClick={() => position ? close() : open()} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); open(); } }}>
       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
     </button>
-    {position && createPortal(<div ref={menu} id={id} role="menu" aria-label={`Actions for ${name}`} className="row-action-menu" style={position}
+    {position && createPortal(<div ref={menu} id={id} role="menu" aria-label={`Actions for ${name}`} className="row-action-menu" style={{ ...position, width }}
       onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) close(); }}
       onKeyDown={event => {
         const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button')];

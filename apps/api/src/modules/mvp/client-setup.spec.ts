@@ -56,6 +56,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
       programId = randomUUID(),
       foreignProgram = randomUUID(),
       nutritionPlanId = randomUUID(),
+      supplementPlanId = randomUUID(),
       formId = randomUUID();
     const auth = (id = coach) =>
       `Bearer ${issueAccessToken(env, { id, role: 'COACH' })}`;
@@ -72,6 +73,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
       exerciseUnit: 'LB',
       programId,
       nutritionPlanId,
+      supplementPlanId,
       membership: {
         name: 'Monthly coaching',
         status: 'ACTIVE',
@@ -87,6 +89,23 @@ describe.skipIf(!process.env.DATABASE_URL)(
         weekdays: [],
       },
     };
+    it('isolates packages by coach, validates selections and audits revision-checked changes', async () => {
+      const bundle = { name: 'Starter package', description: 'Training and nutrition', paymentType: 'ONE_TIME', amount: 100, initialAmount: null, currency: 'INR', durationDays: 30, programId, nutritionPlanId, checkin: { formId, frequency: 'WEEKLY', occurrences: 4, weekdays: [] } };
+      expect((await request(app).post('/coach/packages').send(bundle)).status).toBe(401);
+      expect((await request(app).post('/coach/packages').set('Authorization', auth()).send({ ...bundle, programId: foreignProgram })).status).toBe(400);
+      expect((await request(app).post('/coach/packages').set('Authorization', auth()).send({ ...bundle, amount: -1 })).status).toBe(400);
+      const created = await request(app).post('/coach/packages').set('Authorization', auth()).send(bundle);
+      expect(created.status).toBe(201);
+      const id = String((created.body as { package: { id: string } }).package.id);
+      expect((await request(app).get('/coach/packages').set('Authorization', auth(other))).body).toEqual({ packages: [] });
+      expect((await request(app).put(`/coach/packages/${id}`).set('Authorization', auth(other)).send({ data: bundle, revision: 1, archived: true })).status).toBe(404);
+      expect((await request(app).put(`/coach/packages/${id}`).set('Authorization', auth()).send({ data: bundle, revision: 2, archived: true })).status).toBe(409);
+      expect((await request(app).put(`/coach/packages/${id}`).set('Authorization', auth()).send({ data: bundle, revision: 1, archived: true })).status).toBe(200);
+      const stored = await pool.query<{ revision: number; archived_at: string }>('SELECT revision,archived_at FROM coaching_packages WHERE id=$1', [id]);
+      expect(stored.rows[0]?.revision).toBe(2);
+      expect(stored.rows[0]?.archived_at).toBeTruthy();
+      expect((await pool.query('SELECT id FROM audit_events WHERE entity_id=$1', [id])).rowCount).toBe(2);
+    });
     beforeAll(async () => {
       await admin.query(`CREATE SCHEMA ${schema}`);
       const dir = new URL('../../../db/migrations/', import.meta.url);
@@ -116,6 +135,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
           JSON.stringify({ name: 'Nutrition', kind: 'plans', items: [] }),
         ],
       );
+      await pool.query("INSERT INTO nutrition_library(id,coach_id,kind,data) VALUES($1,$2,'supplements',$3)", [supplementPlanId,coach,JSON.stringify({kind:'supplements',name:'Setup supplements',notes:'',supplements:[{name:'Example',timing:'Breakfast',dosage:'Recorded amount',link:''}]})]);
       const definition = {
         name: 'Daily review',
         fields: [
@@ -137,6 +157,16 @@ describe.skipIf(!process.env.DATABASE_URL)(
       await admin.end();
     });
     it('saves invitation setup, applies it at registration, updates atomically and rejects stale/cross-tenant writes', async () => {
+      const bundle = { name: 'Assigned package', description: 'Coaching', paymentType: 'ONE_TIME', amount: null, initialAmount: null, currency: 'INR', durationDays: 30, programId, nutritionPlanId, checkin: null };
+      const created = await request(app).post('/coach/packages').set('Authorization', auth()).send(bundle);
+      expect(created.status).toBe(201);
+      setup.packageId = (created.body as { package: { id: string } }).package.id;
+      const count = async () => {
+        const response = await request(app).get('/coach/packages').set('Authorization', auth());
+        return (response.body as { packages: { id: string; clientCount: number }[] }).packages.find(p => p.id === setup.packageId)!.clientCount;
+      };
+      const foreign = await request(app).post('/coach/packages').set('Authorization', auth(other)).send({ ...bundle, programId: null, nutritionPlanId: null });
+      expect((await request(app).post('/coach/client-setup').set('Authorization', auth()).send({ ...setup, packageId: (foreign.body as { package: { id: string } }).package.id })).status).toBe(400);
       expect(
         (await request(app).post('/coach/client-setup').send(setup)).status,
       ).toBe(401);
@@ -153,6 +183,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
         .set('Authorization', auth())
         .send(setup);
       expect(invite.status).toBe(201);
+      expect(await count()).toBe(0);
       const invitation = (
         invite.body as { invitation: { id: string; token: string } }
       ).invitation;
@@ -177,6 +208,15 @@ describe.skipIf(!process.env.DATABASE_URL)(
         displayName: 'Client chosen name',
       });
       const id = registered.user.id;
+      expect(await count()).toBe(1);
+      expect((await pool.query('SELECT plan_id FROM supplement_plan_assignments WHERE client_id=$1 AND active',[id])).rows).toEqual([{plan_id:supplementPlanId}]);
+      const clientsPath = `/coach/packages/${setup.packageId}/clients`;
+      expect((await request(app).get(clientsPath)).status).toBe(401);
+      expect((await request(app).get(clientsPath).set('Authorization', auth(other))).status).toBe(404);
+      const assigned = await request(app).get(clientsPath).set('Authorization', auth());
+      expect(assigned.body).toMatchObject({ items: [{ clientId: id, name: 'Test Client', email: setup.email, status: 'PENDING_REVIEW' }], hasMore: false });
+      expect((await request(app).get(`${clientsPath}?query=absent`).set('Authorization', auth())).body).toEqual({ items: [], hasMore: false });
+      expect((await request(app).get(`${clientsPath}?query=TEST`).set('Authorization', auth())).body).toMatchObject({ items: [{ clientId: id }] });
       expect(registered.user.approvalStatus).toBe('PENDING_REVIEW');
       expect(registered.user.displayName).toBe('Test Client');
       expect(
@@ -253,9 +293,11 @@ describe.skipIf(!process.env.DATABASE_URL)(
           await request(app)
             .put(`/coach/client-setup/${id}`)
             .set('Authorization', auth())
-            .send({ revision: 1, data: { ...setup, firstName: 'Updated' } })
+            .send({ revision: 1, data: { ...setup, firstName: 'Updated', packageId: null } })
         ).status,
       ).toBe(200);
+      expect(await count()).toBe(0);
+      expect((await request(app).get(clientsPath).set('Authorization', auth())).body).toEqual({ items: [], hasMore: false });
       expect(
         (
           await request(app)

@@ -529,3 +529,19 @@ button,.link-button{transition:background-color .18s ease,border-color .18s ease
 .editor-dialog-drawer:has(.workout-details)>.editor-body{padding: var(--space-3) var(--space-4)}.editor-dialog-drawer:has(.workout-details)>header{padding: .65rem var(--space-4)}.workout-details{width:100%;min-width:0}.workout-details .workout-detail-exercises>li{padding: .4rem 0}.workout-details .workout-detail-exercise-heading{gap: .4rem}.workout-details .workout-detail-stats{margin-top: var(--space-1)}.workout-details .workout-exercise-instructions{margin-top: var(--space-1)}
 .workout-details .workout-detail-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;gap: .35rem var(--space-2)}.workout-detail-stats>div{min-width:0;flex-wrap:wrap}.workout-detail-exercise-heading h4{flex:1;min-width:0}.exercise-combobox-popup [role=option]{grid-template-columns:52px minmax(0,1fr);align-items:center;gap: .6rem;padding: .4rem .65rem}.exercise-option-text{display:grid;gap: .2rem;min-width:0;overflow-wrap:anywhere}.exercise-option-preview{display:block;width:52px;height:52px;overflow:hidden;border:1px solid #e1e9e4;border-radius: var(--radius-control)}.exercise-option-preview .exercise-media{width:100%;height:100%;min-height:0;background:#fff}.exercise-option-preview .exercise-media>.loading-image{width:100%;height:100%;padding: 0;aspect-ratio:1}.exercise-option-preview .exercise-media img{width:100%;height:100%;object-fit:contain}.exercise-option-preview .exercise-media>div:not(.loading-image){padding: 3px;gap: 0;font-size:.55rem}.exercise-option-preview .image-placeholder svg{width:22px;height:22px}
 @media(max-width:400px){.workout-details .workout-detail-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.package-description { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.page-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 24px; }
+.form-stack { display: grid; gap: 16px; }
+.form-stack .form-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 540px) { .form-stack .form-row { grid-template-columns: minmax(0, 1fr); } }
+
+.packages-page .collection-table { min-width: 1100px; }
+.packages-page .collection-table th, .packages-page .collection-table td { text-align: left; vertical-align: middle; }
+.packages-page .collection-table td:first-child { width: 16%; min-width: 150px; }
+.packages-page .collection-table td:nth-child(2) { min-width: 150px; }
+.packages-page .collection-table td:nth-child(3), .packages-page .collection-table td:nth-child(4), .packages-page .collection-table td:nth-child(7) { white-space: nowrap; }
+.packages-page .collection-table td:nth-child(5) { width: 30%; min-width: 240px; }
+.packages-page .status { display: inline-flex; align-items: center; white-space: nowrap; }
+.package-included-plans { display: grid; gap: 4px; line-height: 1.5; overflow-wrap: anywhere; }

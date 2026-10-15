@@ -56,7 +56,7 @@ const authorName = "COALESCE(cp.display_name,cl.display_name,'Community member')
 
 export function createFeedRouter(environment: Environment, pool: Pool): Router {
   const router = Router();
-  router.use(authenticate(environment));
+  router.use(authenticate(environment, pool));
   router.use(rateLimit({ windowMs: 60000, limit: 120, keyGenerator: request => request.auth!.userId, standardHeaders: 'draft-8', legacyHeaders: false, message: { message: 'Too many requests. Please try again in a minute.' } }));
   router.use(json({ limit: '29mb' }));
   type Work = (client: PoolClient, ctx: Context, request: Request) => Promise<{ status?: number; body?: unknown; file?: Attachment }>;

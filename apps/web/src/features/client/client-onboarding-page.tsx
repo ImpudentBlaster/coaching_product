@@ -1,3 +1,5 @@
+import { formatDateTime } from '../../lib/dates';
+import { SelectControl } from '../../components/form-controls';
 import { Notice } from '../../components/editor-dialog';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -45,7 +47,7 @@ export function ClientOnboardingPage() {
   return <section className="onboarding-page">
     <header className="onboarding-welcome"><p className="eyebrow">Your starting point</p><h1>{locked?'Your initial questionnaire':'Welcome to your coaching journey'}</h1><p className="lede">Tell your coach about yourself so they can prepare your training and nutrition plan.</p>
       <p>{locked?record.status==='REVIEWED'?'Your coach has reviewed your answers.':'Submitted — your answers are ready for your coach to review.':'Complete the four sections below. Fields marked * are required. Save a draft whenever you need a break.'}</p>
-      {record?.submittedAt&&<p>Submitted {new Date(record.submittedAt).toLocaleString()}{record.reviewedAt?` · Reviewed ${new Date(record.reviewedAt).toLocaleString()}`:''}</p>}
+      {record?.submittedAt&&<p>Submitted {formatDateTime(record.submittedAt)}{record.reviewedAt?` · Reviewed ${formatDateTime(record.reviewedAt)}`:''}</p>}
     </header>
     <nav className="onboarding-sections" aria-label="Questionnaire sections">{onboardingSections.map((section,index)=><a href={`#onboarding-${index}`} key={section.title}><span>{index+1}</span>{section.title}</a>)}</nav>
     <form ref={form} onSubmit={handleSubmit} className="onboarding-form">
@@ -55,7 +57,7 @@ export function ClientOnboardingPage() {
           const initial = record?.data[field.name];
           if (field.type === 'days') return <fieldset className="onboarding-days" key={field.name}><legend>{field.label}</legend>{days.map(day=><label key={day}><input name={field.name} type="checkbox" value={day} defaultChecked={Array.isArray(initial)&&initial.includes(day)}/>{day}</label>)}</fieldset>;
           return <label key={field.name}>{field.label}{field.required?' *':''}
-            {field.type==='experience'?<select name={field.name} defaultValue={String(initial??'')} required><option value="">Select your experience</option><option value="BEGINNER">Beginner</option><option value="INTERMEDIATE">Intermediate</option><option value="ADVANCED">Advanced</option></select>
+            {field.type==='experience'?<SelectControl aria-label={`${field.label}${field.required?' *':''}`} name={field.name} defaultValue={String(initial??'')} required><option value="">Select your experience</option><option value="BEGINNER">Beginner</option><option value="INTERMEDIATE">Intermediate</option><option value="ADVANCED">Advanced</option></SelectControl>
               :field.type==='number'?<input name={field.name} type="number" min={field.step??1} max={field.max} step={field.step??1} required={field.required} defaultValue={String(initial??'')}/>
               :field.type==='equipment'?<input name={field.name} maxLength={field.maxLength} defaultValue={Array.isArray(initial)?initial.join(', '):String(initial??'')} placeholder="For example: dumbbells, resistance bands"/>
               :<textarea name={field.name} rows={3} required={field.required} minLength={field.required?2:undefined} maxLength={field.maxLength} defaultValue={String(initial??'')}/>}

@@ -1,0 +1,24 @@
+import '@testing-library/jest-dom/vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import { ClientMessages } from './client-messages';
+import { apiRequest } from '../../lib/api';
+vi.mock('../../lib/api', () => ({ apiRequest: vi.fn() }));
+vi.mock('../auth/auth-context', () => ({ useAuth: () => ({ user: { id: 'client' } }) }));
+afterEach(() => { cleanup(); vi.resetAllMocks(); });
+it('labels both sides, preserves failed drafts, and refreshes history', async () => {
+  vi.mocked(apiRequest).mockResolvedValue({ messages: [{ id: 'one', authorUserId: 'coach', message: 'Welcome', createdAt: '2026-10-07T10:00:00Z' }, { id: 'two', authorUserId: 'client', message: 'Thanks', createdAt: '2026-10-07T11:00:00Z' }] });
+  const view = render(<ClientMessages refreshVersion={0} />);
+  await screen.findByText('Welcome');
+  expect(screen.getByText('Coach')).toBeInTheDocument();
+  expect(screen.getByText('You')).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Message your coach'), { target: { value: 'An update' } });
+  vi.mocked(apiRequest).mockRejectedValueOnce(new Error('Unable to send'));
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await screen.findByText('Unable to send');
+  expect(screen.getByLabelText('Message your coach')).toHaveValue('An update');
+  vi.mocked(apiRequest).mockResolvedValue({ messages: [] });
+  view.rerender(<ClientMessages refreshVersion={1} />);
+  await screen.findByText('No messages yet. Send your coach an update below.');
+  expect(screen.getByLabelText('Message your coach')).toHaveValue('An update');
+});

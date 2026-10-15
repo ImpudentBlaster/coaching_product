@@ -1,3 +1,4 @@
+import { SelectControl } from '../../components/form-controls';
 import { Notice } from '../../components/editor-dialog';
 import { useState, type FormEvent } from 'react';
 import { ExerciseSelect } from './exercise-select';
@@ -8,7 +9,7 @@ export function ProgramForm({ templates, exercises = [], onSaved, onMessage, ini
   exercises?: Exercise[];
   initial?: Program|undefined;
   onBusy?: (busy:boolean)=>void;
-  onSaved: () => Promise<void>;
+  onSaved: (id?:string) => Promise<void>;
   onMessage: (message: string) => void;
 }) {
   function newDay(dayLabel: string) { return { id: crypto.randomUUID(), dayLabel, mode: templates.some(template => !template.archived_at && !template.program_day_only) ? 'workout' : 'manual', exerciseRows: [crypto.randomUUID()] }; }
@@ -24,7 +25,7 @@ export function ProgramForm({ templates, exercises = [], onSaved, onMessage, ini
     const data = new FormData(form);
     setSaving(true);onBusy?.(true);setError('');
     try {
-      await apiRequest(`/coach/programs${initial?'/'+initial.id:''}`, {
+      const result = await apiRequest<{program:{id:string}}>(`/coach/programs${initial?'/'+initial.id:''}`, {
         method: initial?'PUT':'POST',
         body: JSON.stringify({
           name: String(data.get('name')),
@@ -44,7 +45,7 @@ export function ProgramForm({ templates, exercises = [], onSaved, onMessage, ini
       form.reset();
       setRows([newDay('Day 1')]);
       onMessage(initial?'Program updated successfully.':'Program created successfully.');
-      await onSaved();
+      await onSaved(result?.program?.id);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unable to create program');
     } finally {
@@ -68,11 +69,11 @@ export function ProgramForm({ templates, exercises = [], onSaved, onMessage, ini
 
     {rows.map((row, index) => <fieldset key={row.id} disabled={saving} style={{ display: 'grid', gap: '1rem', minWidth: 0 }}>
       <legend>Day {index + 1}</legend>
-      <label>Day exercises<select value={row.mode} onChange={event => { const mode = event.target.value; setRows(current => current.map(item => item.id === row.id ? { ...item, mode } : item)); }}><option value="workout" disabled={!availableTemplates.length}>Existing workout</option><option value="manual">Add exercises manually</option></select></label>
-      {row.mode === 'workout' ? <label>Workout<select name={`${row.id}-template`} required defaultValue={initial?.days[Number(row.id)]?.templateId??''}>
+      <label>Day exercises<SelectControl aria-label="Day exercises" value={row.mode} onChange={event => { const mode = event.target.value; setRows(current => current.map(item => item.id === row.id ? { ...item, mode } : item)); }}><option value="workout" disabled={!availableTemplates.length}>Existing workout</option><option value="manual">Add exercises manually</option></SelectControl></label>
+      {row.mode === 'workout' ? <label>Workout<SelectControl aria-label="Workout" name={`${row.id}-template`} required defaultValue={initial?.days[Number(row.id)]?.templateId??''}>
         <option value="">Choose workout</option>
         {availableTemplates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}
-      </select></label> : <>
+      </SelectControl></label> : <>
         {row.exerciseRows.map((exerciseRow, exerciseIndex) => {
           const prefix = `${row.id}-${exerciseRow}`;
           const original = templates.find(template => template.id === initial?.days[Number(row.id)]?.templateId)?.exercises[Number(exerciseRow)];

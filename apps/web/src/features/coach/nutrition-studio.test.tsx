@@ -1,3 +1,4 @@
+import { formatDateTime } from '../../lib/dates';
 import { GlobalNotifications } from '../../components/global-notifications';
 import { notify } from '../../lib/notify';
 import { MemoryRouter } from 'react-router-dom';
@@ -74,8 +75,8 @@ it('shows meals in a searchable table and opens their foods in a detail drawer',
   render(<MemoryRouter initialEntries={['/coach/studio?tab=nutrition&section=meals']}><NutritionStudio clients={[]}/></MemoryRouter>);
   const table=await screen.findByRole('table',{name:'Nutrition meals'});
   expect(within(table).getAllByRole('columnheader').map(cell=>cell.textContent)).toEqual(['Name','Foods','Macronutrients','Calories','Created at','Updated at','Action','View']);
-  expect(within(table).getByText(new Date(food.createdAt).toLocaleString())).toBeInTheDocument();
-  expect(within(table).getByText(new Date('2026-10-03T12:00:00Z').toLocaleString())).toBeInTheDocument();
+  expect(within(table).getByText(formatDateTime(food.createdAt))).toBeInTheDocument();
+  expect(within(table).getByText(formatDateTime('2026-10-03T12:00:00Z'))).toBeInTheDocument();
   fireEvent.click(within(table).getByRole('button',{name:'View Breakfast'}));
   const dialog=screen.getByRole('dialog',{name:'Meal details'});
   expect(dialog).toHaveClass('editor-dialog-drawer');
@@ -162,8 +163,8 @@ it('creates named entries with a saved meal and multiple foods', async () => {
   fireEvent.click(await screen.findByRole('button',{name:'Add day'}));
   fireEvent.change(screen.getByLabelText('Name'),{target:{value:'Training day'}});
   fireEvent.change(screen.getByLabelText('Entry name'),{target:{value:'Morning'}});
-  fireEvent.change(screen.getByLabelText('Entry type'),{target:{value:'meals'}});
-  fireEvent.change(screen.getByLabelText('Meal'),{target:{value:meal.id}});
+  fireEvent.change(selectInput('Entry type'),{target:{value:'meals'}});
+  fireEvent.change(selectInput('Meal'),{target:{value:meal.id}});
   fireEvent.click(screen.getByRole('button',{name:'Add entry'}));
   fireEvent.change(screen.getAllByLabelText('Entry name')[1]!,{target:{value:'Lunch'}});
   fireEvent.focus(screen.getByRole('combobox',{name:'Food 1'}));
@@ -231,10 +232,10 @@ it('creates a plan using a saved day and a custom day with grouped foods',async(
   render(<MemoryRouter initialEntries={['/coach/studio?tab=nutrition&section=plans']}><NutritionStudio clients={[]}/></MemoryRouter>);
   fireEvent.click(await screen.findByRole('button',{name:'Add plan'}));
   fireEvent.change(screen.getByLabelText('Plan name'),{target:{value:'Weekly plan'}});
-  fireEvent.change(screen.getByLabelText('Day template'),{target:{value:day.id}});
+  fireEvent.change(selectInput('Day template'),{target:{value:day.id}});
   fireEvent.click(screen.getByRole('button',{name:'Add day'}));
   fireEvent.change(screen.getByLabelText('Day name'),{target:{value:'Rest day'}});
-  fireEvent.change(screen.getByLabelText('Day type'),{target:{value:'custom'}});
+  fireEvent.change(selectInput('Day type'),{target:{value:'custom'}});
   fireEvent.click(screen.getByRole('button',{name:'Add meal'}));
   fireEvent.change(screen.getByLabelText('Meal name'),{target:{value:'Breakfast'}});
   fireEvent.click(screen.getByRole('button',{name:'Add food'}));
@@ -296,7 +297,7 @@ it('opens incomplete collapsed plan meals and confirms structural changes on can
   fireEvent.click(await screen.findByRole('button',{name:'Add plan'}));
   fireEvent.change(screen.getByLabelText('Plan name'),{target:{value:'Weekly plan'}});
   fireEvent.change(screen.getByLabelText('Day name'),{target:{value:'Training'}});
-  fireEvent.change(screen.getByLabelText('Day type'),{target:{value:'custom'}});
+  fireEvent.change(selectInput('Day type'),{target:{value:'custom'}});
   fireEvent.click(screen.getByRole('button',{name:'Add meal'}));
   expect(screen.getByText('No foods added yet.')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button',{name:'Done with meal'}));
@@ -311,3 +312,8 @@ it('opens incomplete collapsed plan meals and confirms structural changes on can
   fireEvent.click(screen.getByRole('button',{name:'Keep editing'}));
   expect(screen.getByLabelText('Meal name')).toBeInTheDocument();
 });
+
+// Exercise the library's hidden select for HTML form integration.
+function selectInput(label: string | RegExp, index = 0) {
+  return screen.getAllByLabelText(label)[index]!.closest('.form-control')!.querySelector('select')!;
+}

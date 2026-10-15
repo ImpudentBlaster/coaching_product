@@ -57,7 +57,7 @@ fieldset { border-radius: var(--radius-card); padding: var(--space-4); }
 .loading-panel-lines { gap: var(--space-3); margin-top: var(--space-4); }
 .notice, .error, .feed-confirm { border-radius: var(--radius-control); padding: var(--space-3) var(--space-4); gap: var(--space-3); }
 .notice { margin: var(--space-4) 0; }
-.editor-dialog[open] { display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius-panel); }
+.editor-dialog[open] { display: flex; flex-direction: column; overflow: visible; border-radius: var(--radius-panel); }
 .editor-dialog > header { flex: 0 0 auto; padding: var(--space-4) var(--space-5); gap: var(--space-4); }
 .editor-dialog > .editor-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: var(--space-5); overscroll-behavior: contain; scrollbar-gutter: stable; }
 .unsaved-changes-sheet { flex: 0 0 auto; padding: var(--space-4) var(--space-5); border-top: 1px solid var(--color-border); background: var(--color-surface); }

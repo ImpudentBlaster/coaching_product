@@ -38,7 +38,7 @@ describe.skipIf(!process.env.DATABASE_URL)('check-in storage and authorization',
   const coachToken=token(coach,'COACH'), clientToken=token(person,'CLIENT');
   beforeAll(async()=>{
     await admin.query(`CREATE SCHEMA ${schema}`);
-    for(const file of ['001_identity_approvals.sql','002_demo_mvp.sql','003_nutrition_library.sql'])await pool.query(await readFile(new URL(`../../../db/migrations/${file}`,import.meta.url),'utf8'));
+    for(const file of ['001_identity_approvals.sql','002_demo_mvp.sql','003_nutrition_library.sql', '014_supplement_plans.sql'])await pool.query(await readFile(new URL(`../../../db/migrations/${file}`,import.meta.url),'utf8'));
     for(const [id,role] of [[coach,'COACH'],[other,'COACH'],[person,'CLIENT'],[stranger,'CLIENT']]){
       await pool.query("INSERT INTO users(id,email,password_hash,role,account_status) VALUES($1,$2,'unused-test-hash',$3,'APPROVED')",[id,`${id}@example.test`,role]);
       if(role==='COACH')await pool.query("INSERT INTO coach_profiles(user_id,display_name,business_name) VALUES($1,'Test coach','Test business')",[id]);

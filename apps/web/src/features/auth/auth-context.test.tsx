@@ -8,6 +8,7 @@ import { apiBlob, apiRequest, refreshSession, setAccessToken } from '../../lib/a
 const user = { id: 'coach', displayName: 'Aman', role: 'COACH', approvalStatus: 'APPROVED' };
 const sessionResponse = () => new Response(JSON.stringify({ accessToken: 'in-memory-test-token', user }), { status: 200, headers: { 'content-type': 'application/json' } });
 function SessionView() { const { user } = useAuth(); return <p>{user ? `Signed in as ${user.displayName}` : 'Signed out'}</p>; }
+function SwitchView() { const { switchToClient } = useAuth(); return <><SessionView /><button onClick={() => void switchToClient('client')}>Switch client</button></>; }
 afterEach(() => { cleanup(); setAccessToken(null); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it('restores a reopened tab and sends only one refresh under StrictMode', async () => {
@@ -54,4 +55,20 @@ it('deduplicates simultaneous expired API and private image requests', async () 
   await expect(image).resolves.toMatchObject({ size: expect.any(Number) });
   await startup;
   expect(fetch.mock.calls.filter(call => String(call[0]).endsWith('/auth/refresh'))).toHaveLength(1);
+});
+it('replaces the coach identity and in-memory token with the switched client session', async () => {
+  const fetch = vi.fn().mockImplementation((path: string, init?: RequestInit) => {
+    if (path.endsWith('/auth/refresh')) return Promise.resolve(sessionResponse());
+    if (path.endsWith('/auth/switch-client/client')) return Promise.resolve(new Response(JSON.stringify({ accessToken: 'client-session-token', user: { ...user, id: 'client', role: 'CLIENT', displayName: 'Taylor' } }), { status: 200 }));
+    expect(new Headers(init?.headers).get('authorization')).toBe('Bearer client-session-token');
+    return Promise.resolve(new Response('{"ok":true}', { status: 200 }));
+  });
+  vi.stubGlobal('fetch', fetch);
+  const storage = vi.spyOn(Storage.prototype, 'setItem');
+  render(<AuthProvider><SwitchView /></AuthProvider>);
+  await screen.findByText('Signed in as Aman');
+  fireEvent.click(screen.getByRole('button', { name: 'Switch client' }));
+  await screen.findByText('Signed in as Taylor');
+  await apiRequest('/client/workspace');
+  expect(storage).not.toHaveBeenCalled();
 });

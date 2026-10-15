@@ -19,7 +19,7 @@ describe.skipIf(!process.env.DATABASE_URL)('coach client profile',()=>{
   const app=express();app.use(express.json());app.use(createMvpRouter(env,pool));
   beforeAll(async()=>{
     await admin.query(`CREATE SCHEMA ${schema}`);
-    for(const file of ['001_identity_approvals.sql','002_demo_mvp.sql','003_nutrition_library.sql','004_checkin_forms.sql','005_daily_checkin_photos.sql','006_library_management.sql','007_client_setup.sql'])await pool.query(await readFile(new URL(`../../../db/migrations/${file}`,import.meta.url),'utf8'));
+    for(const file of ['001_identity_approvals.sql','002_demo_mvp.sql','003_nutrition_library.sql', '014_supplement_plans.sql','004_checkin_forms.sql','005_daily_checkin_photos.sql','006_library_management.sql','007_client_setup.sql'])await pool.query(await readFile(new URL(`../../../db/migrations/${file}`,import.meta.url),'utf8'));
     for(const id of [coach,other,client])await pool.query("INSERT INTO users(id,email,password_hash,role,account_status) VALUES($1,$2,'unused-test-hash',$3,'APPROVED')",[id,`${id}@example.test`,id===client?'CLIENT':'COACH']);
     await pool.query("INSERT INTO client_profiles(user_id,display_name) VALUES($1,'Profile client')",[client]);
     await pool.query("INSERT INTO coach_clients(coach_id,client_id,status) VALUES($1,$2,'APPROVED')",[coach,client]);
@@ -33,6 +33,29 @@ describe.skipIf(!process.env.DATABASE_URL)('coach client profile',()=>{
     const response=await request(app).get(`/coach/clients/${client}/profile`).set('Authorization',token(coach,'COACH'));
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({profile:{client:{id:client,displayName:'Profile client'},onboarding:{data:{weight:72}},program:null,nutrition:null,workouts:[],progress:[{measurement_date:'2026-09-20',notes:'Recorded progress'}],checkins:[{status:'PENDING',form:{name:'Daily review'}}],subscription:{plan_name:'Monthly coaching'}}});
+  });
+  it('removes only owned client assignments and rolls back removal when auditing fails',async()=>{
+    await pool.query("INSERT INTO coach_profiles(user_id,display_name,business_name) VALUES($1,'Coach','Business')",[coach]);
+    for(const kind of ['program','nutrition','supplements'] as const){
+      const planId=randomUUID();
+      const table=kind==='program'?'program_assignments':kind==='nutrition'?'nutrition_plan_assignments':'supplement_plan_assignments';
+      const column=kind==='program'?'program_id':'plan_id';
+      if(kind==='program')await pool.query("INSERT INTO programs(id,coach_id,name) VALUES($1,$2,'Assigned program')",[planId,coach]);
+      else await pool.query('INSERT INTO nutrition_library(id,coach_id,kind,data) VALUES($1,$2,$3,$4)',[planId,coach,kind==='nutrition'?'plans':'supplements',JSON.stringify({name:'Assigned plan'})]);
+      await pool.query(`INSERT INTO ${table}(coach_id,client_id,${column},snapshot) VALUES($1,$2,$3,'{}')`,[coach,client,planId]);
+      const path=`/coach/clients/${client}/profile/plans/${kind}/${planId}`;
+      expect((await request(app).delete(path).set('Authorization',token(other,'COACH'))).status).toBe(404);
+      expect((await request(app).delete(path).set('Authorization',token(client,'CLIENT'))).status).toBe(403);
+      await pool.query("ALTER TABLE audit_events ADD CONSTRAINT fail_assignment_remove CHECK(entity_type <> 'CLIENT_PLAN_ASSIGNMENT') NOT VALID");
+      try{
+        expect((await request(app).delete(path).set('Authorization',token(coach,'COACH'))).status).toBe(500);
+        expect((await pool.query(`SELECT id FROM ${table} WHERE ${column}=$1 AND active`,[planId])).rowCount).toBe(1);
+      }finally{await pool.query('ALTER TABLE audit_events DROP CONSTRAINT fail_assignment_remove');}
+      expect((await request(app).delete(path).set('Authorization',token(coach,'COACH'))).status).toBe(204);
+      expect((await pool.query(`SELECT id FROM ${table} WHERE ${column}=$1 AND NOT active`,[planId])).rowCount).toBe(1);
+      expect((await pool.query('SELECT id FROM '+(kind==='program'?'programs':'nutrition_library')+' WHERE id=$1',[planId])).rowCount).toBe(1);
+      expect((await request(app).delete(path).set('Authorization',token(coach,'COACH'))).status).toBe(409);
+    }
   });
   it('denies unknown, cross-coach, wrong-role and revoked access',async()=>{
     const path=`/coach/clients/${client}/profile`;

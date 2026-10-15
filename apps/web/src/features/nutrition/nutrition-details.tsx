@@ -1,3 +1,4 @@
+import { SupplementDetails, type SupplementPlan } from '../coach/supplement-studio';
 import { useEffect, useState } from 'react';
 import { apiRequest } from '../../lib/api';
 
@@ -22,16 +23,18 @@ export function NutritionDetails({ node }: { node: NutritionNode }) {
 }
 export function AssignedNutritionPlan() {
   const [assignment, setAssignment] = useState<{ snapshot: NutritionNode } | null>(null);
+  const [supplements, setSupplements] = useState<{snapshot:SupplementPlan}|null>(null);
   const [status, setStatus] = useState('Loading meal plan…');
   useEffect(() => {
     let active = true;
-    void apiRequest<{ assignment: { snapshot: NutritionNode } | null }>('/client/nutrition-plan').then(result => {
-      if (active) { setAssignment(result.assignment); setStatus(result.assignment ? '' : 'Your coach has not assigned a meal plan yet.'); }
+    void apiRequest<{ assignment: { snapshot: NutritionNode } | null; supplements?: {snapshot:SupplementPlan}|null }>('/client/nutrition-plan').then(result => {
+      if (active) { setAssignment(result.assignment); setSupplements(result.supplements ?? null); setStatus(result.assignment ? '' : 'Your coach has not assigned a meal plan yet.'); }
     }).catch((error: unknown) => { if (active) setStatus(error instanceof Error ? error.message : 'Unable to load meal plan'); });
     return () => { active = false; };
   }, []);
   return <section className="card plan-summary nutrition-assigned"><p className="eyebrow">Assigned meal plan</p>
     {status && <p role="status">{status}</p>}
     {assignment && <><h2>{assignment.snapshot.name}</h2><NutritionDetails node={assignment.snapshot}/></>}
+    {supplements && <section><p className="eyebrow">Assigned supplement plan</p><SupplementDetails plan={supplements.snapshot}/></section>}
   </section>;
 }

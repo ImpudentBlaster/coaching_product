@@ -1,3 +1,4 @@
+import { formatDateTime } from '../../lib/dates';
 import { useEffect, useState } from 'react';
 import { apiRequest } from '../../lib/api';
 import { onboardingSections, type Onboarding } from '../client/onboarding-types';
@@ -23,8 +24,7 @@ export function CoachOnboarding({clientId,onReviewed}:{clientId:string;onReviewe
     {record===undefined&&!error&&<p role="status">Loading questionnaire…</p>}
     {record===null&&<p>This client has not started their questionnaire yet.</p>}
     {record&&<><p className="status">{record.status==='DRAFT'?'Draft — not submitted':record.status==='SUBMITTED'?'Submitted — ready for review':'Reviewed'}</p>
-      {record.submittedAt&&<p>Submitted {new Date(record.submittedAt).toLocaleString()}</p>}
-      {record.reviewedAt&&<p>Reviewed {new Date(record.reviewedAt).toLocaleString()}</p>}
+      {(record.submittedAt || record.reviewedAt) && <dl className="onboarding-timestamps">{record.submittedAt && <div><dt>Submitted</dt><dd><time dateTime={record.submittedAt}>{formatDateTime(record.submittedAt)}</time></dd></div>}{record.reviewedAt && <div><dt>Reviewed</dt><dd><time dateTime={record.reviewedAt}>{formatDateTime(record.reviewedAt)}</time></dd></div>}</dl>}
       {onboardingSections.map(section=><section key={section.title}><h3>{section.title}</h3><dl>{section.fields.map(field=>{const value=record.data[field.name];return <div className="onboarding-answer" key={field.name}><dt>{field.label}</dt><dd>{Array.isArray(value)?value.join(', ')||'Not provided':value===''||value===undefined||value===null?'Not provided':String(value)}</dd></div>;})}</dl></section>)}
       {record.status==='SUBMITTED'&&<button className="primary" disabled={busy} onClick={()=>void review()}>{busy?'Saving…':'Mark as reviewed'}</button>}
     </>}

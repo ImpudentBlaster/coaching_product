@@ -1,3 +1,5 @@
+import { formatDateTime, formatDate } from '../../lib/dates';
+import { SelectControl } from '../../components/form-controls';
 import { CheckinPhotos } from './checkin-photos';
 import { useState } from 'react';
 import { apiRequest } from '../../lib/api';
@@ -10,7 +12,7 @@ export function DailyCheckins({checkins,onSaved}:{checkins:Checkin[];onSaved:()=
   const [day,setDay]=useState(today);
   const dates=[...new Set([today,...checkins.map(checkin=>checkin.dueDate)])].sort();
   const selected=checkins.filter(checkin=>checkin.dueDate===day);
-  return <div><label className="daily-checkin-picker">Check-in date<select value={day} onChange={event=>setDay(event.target.value)}>{dates.map(date=><option key={date} value={date}>{date}{date===today?' (Today)':''}</option>)}</select></label>
+  return <div><label className="daily-checkin-picker">Check-in date<SelectControl aria-label="Check-in date" value={day} onChange={event=>setDay(event.target.value)}>{dates.map(date=><option key={date} value={date}>{formatDate(date)}{date===today?' (Today)':''}</option>)}</SelectControl></label>
     {selected.length===0&&<p>No check-in assigned for this date. Choose another date to view your assignments.</p>}
     <div className="workbench-grid">{selected.map(checkin=><ClientCheckin key={`${checkin.id}-${checkin.revision}`} checkin={checkin} onSaved={onSaved}/>)}</div>
   </div>;
@@ -29,14 +31,14 @@ export function ClientCheckin({checkin,onSaved}:{checkin:Checkin;onSaved:()=>Pro
     catch(error){setMessage(error instanceof Error?error.message:'Unable to save check-in');}
     finally{setBusy(false);}
   }
-  return <article className="card profile-card vertical"><h2>{checkin.form.name}</h2><p>Due {checkin.dueDate} · {checkin.status.toLowerCase()}</p><p>{checkin.notes}</p>
+  return <article className="card profile-card vertical"><h2>{checkin.form.name}</h2><p>Due {formatDate(checkin.dueDate)} · {checkin.status.toLowerCase()}</p><p>{checkin.notes}</p>
     {message&&<p role="alert">{message}</p>}
     <form className="checkin-fields" noValidate onSubmit={event=>{event.preventDefault();void save(true);}}>
       <CheckinFields definition={checkin.form} answers={answers} disabled={busy||photoBusy||locked} onChange={(id,value)=>setAnswers(current=>({...current,[id]:value}))}/>
       {!locked&&<><p>Fields marked * are required when submitting. You can save an incomplete draft.</p><div className="actions"><button className="secondary" type="button" disabled={busy||photoBusy} onClick={()=>void save(false)}>Save draft</button><button className="primary" disabled={busy||photoBusy}>{busy?'Saving…':'Submit check-in'}</button></div></>}
     </form>
     <CheckinPhotos id={checkin.id} locked={locked} disabled={busy} onBusyChange={setPhotoBusy}/>
-    {checkin.submittedAt&&<p>Submitted {new Date(checkin.submittedAt).toLocaleString()}</p>}
-    {checkin.reviewStatus&&<div className="checkin-review"><strong>{checkin.reviewStatus.replaceAll('_',' ')}</strong><p>{checkin.reviewNotes}</p>{checkin.reviewedAt&&<small>Reviewed {new Date(checkin.reviewedAt).toLocaleString()}</small>}</div>}
+    {checkin.submittedAt&&<p>Submitted {formatDateTime(checkin.submittedAt)}</p>}
+    {checkin.reviewStatus&&<div className="checkin-review"><strong>{checkin.reviewStatus.replaceAll('_',' ')}</strong><p>{checkin.reviewNotes}</p>{checkin.reviewedAt&&<small>Reviewed {formatDateTime(checkin.reviewedAt)}</small>}</div>}
   </article>;
 }

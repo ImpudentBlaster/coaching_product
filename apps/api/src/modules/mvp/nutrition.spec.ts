@@ -65,7 +65,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
       for (const file of [
         '001_identity_approvals.sql',
         '002_demo_mvp.sql', '009_custom_exercises.sql', '010_program_exercise_days.sql',
-        '003_nutrition_library.sql',
+        '003_nutrition_library.sql', '014_supplement_plans.sql',
  '006_library_management.sql',
       ]) {
         await pool.query(
@@ -205,6 +205,21 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect((await pool.query('SELECT id FROM workout_templates WHERE coach_id=$1 AND program_day_only', [coach])).rowCount).toBe(1);
       expect((await pool.query<{ snapshot: unknown }>('SELECT snapshot FROM program_assignments WHERE program_id=$1', [programId])).rows[0]!.snapshot).toEqual(snapshot);
     });
+    it('publishes a program with its audit event in one transaction',async()=>{
+      const programId=randomUUID(),templateId=randomUUID();
+      await pool.query("INSERT INTO workout_templates(id,coach_id,name) VALUES($1,$2,'Publish workout')",[templateId,coach]);
+      await pool.query("INSERT INTO programs(id,coach_id,name) VALUES($1,$2,'Publish program')",[programId,coach]);
+      await pool.query("INSERT INTO program_days(program_id,template_id,position,day_label) VALUES($1,$2,0,'Day 1')",[programId,templateId]);
+      const path=`/coach/programs/${programId}/publish`;
+      expect((await request(app).post(path).set('Authorization',token(otherCoach,'COACH'))).status).toBe(409);
+      await pool.query("ALTER TABLE audit_events ADD CONSTRAINT fail_publish_audit CHECK(action <> 'PROGRAM_PUBLISHED') NOT VALID");
+      try {
+        expect((await request(app).post(path).set('Authorization',coachToken)).status).toBe(500);
+        expect((await pool.query<{status:string}>('SELECT status FROM programs WHERE id=$1',[programId])).rows[0]!.status).toBe('DRAFT');
+      }finally{await pool.query('ALTER TABLE audit_events DROP CONSTRAINT fail_publish_audit');}
+      expect((await request(app).post(path).set('Authorization',coachToken)).status).toBe(200);
+      expect((await pool.query("SELECT id FROM audit_events WHERE action='PROGRAM_PUBLISHED' AND entity_id=$1",[programId])).rowCount).toBe(1);
+    });
     it('archives programs only for their owner and rolls back when auditing fails',async()=>{
       const programId=randomUUID();
       await pool.query("INSERT INTO programs(id,coach_id,name,description) VALUES($1,$2,'Test program','')",[programId,coach]);
@@ -215,6 +230,31 @@ describe.skipIf(!process.env.DATABASE_URL)(
       await pool.query('ALTER TABLE audit_events DROP CONSTRAINT fail_program_audit');
       expect((await request(app).delete(`/coach/programs/${programId}`).set('Authorization',coachToken)).status).toBe(204);
       expect((await pool.query("SELECT id FROM audit_events WHERE action='PROGRAM_ARCHIVED' AND entity_id=$1",[programId])).rowCount).toBe(1);
+    });
+    it('assigns standalone supplements independently, isolates coaches, preserves snapshots and rolls back failed audits', async () => {
+      const data = {name:'Daily supplements',notes:'With food',supplements:[{name:'Example supplement',timing:'After breakfast',dosage:'Recorded dosage',link:''}]};
+      const created = await request(app).post('/coach/nutrition-library/supplements').set('Authorization',coachToken).send(data);
+      expect(created.status).toBe(201);
+      const entry = (created.body as {entry:{id:string;version:number;data:NutritionNode}}).entry;
+      const path = `/coach/nutrition-library/supplements/${entry.id}/assign`;
+      expect((await request(app).post(path).set('Authorization',token(otherCoach,'COACH')).send({clientId:client})).status).toBe(404);
+      expect((await request(app).post(path).set('Authorization',coachToken).send({clientId:outsider})).status).toBe(404);
+      expect((await request(app).post(path).set('Authorization',token(client,'CLIENT')).send({clientId:client})).status).toBe(403);
+      const before = (await pool.query('SELECT id FROM nutrition_plan_assignments WHERE client_id=$1 AND active',[client])).rows;
+      expect((await request(app).post(path).set('Authorization',coachToken).send({clientId:client})).status).toBe(201);
+      expect((await pool.query('SELECT id FROM nutrition_plan_assignments WHERE client_id=$1 AND active',[client])).rows).toEqual(before);
+      const snapshot = (await pool.query<{snapshot:NutritionNode}>('SELECT snapshot FROM supplement_plan_assignments WHERE client_id=$1 AND active',[client])).rows[0]!.snapshot;
+      expect(snapshot).toMatchObject(data);
+      expect((await request(app).put(`/coach/nutrition-library/supplements/${entry.id}`).set('Authorization',coachToken).send({...data,name:'Updated supplements',version:entry.version})).status).toBe(200);
+      await pool.query("ALTER TABLE audit_events ADD CONSTRAINT fail_supplement_audit CHECK(action <> 'SUPPLEMENT_ASSIGNED') NOT VALID");
+      try {
+        expect((await request(app).post(path).set('Authorization',coachToken).send({clientId:client})).status).toBe(500);
+        expect((await pool.query('SELECT snapshot FROM supplement_plan_assignments WHERE client_id=$1 AND active',[client])).rows).toEqual([{snapshot}]);
+      } finally {await pool.query('ALTER TABLE audit_events DROP CONSTRAINT fail_supplement_audit');}
+      expect((await request(app).delete(`/coach/nutrition-library/supplements/${entry.id}`).set('Authorization',coachToken)).status).toBe(204);
+      const assigned = await request(app).get('/client/nutrition-plan').set('Authorization',token(client,'CLIENT'));
+      expect((assigned.body as {supplements:{snapshot:NutritionNode}}).supplements.snapshot).toEqual(snapshot);
+      expect(nutritionInput.safeParse({...data,kind:'supplements',supplements:[{...data.supplements[0],link:'javascript:alert(1)'}]}).success).toBe(false);
     });
     it('creates the entire hierarchy, enforces tenancy, replaces assignments, and audits atomically', async () => {
       async function create(kind: string, body: object, auth = coachToken) {
@@ -380,7 +420,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
             .get('/client/nutrition-plan')
             .set('Authorization', token(outsider, 'CLIENT'))
         ).body,
-      ).toEqual({ assignment: null });
+      ).toEqual({ assignment: null, supplements: null });
       expect(
         (
           await pool.query(
@@ -440,7 +480,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
             .get('/client/nutrition-plan')
             .set('Authorization', token(client, 'CLIENT'))
         ).body,
-      ).toEqual({ assignment: null });
+      ).toEqual({ assignment: null, supplements: null });
     });
   },
 );
