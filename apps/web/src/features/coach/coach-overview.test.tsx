@@ -11,7 +11,7 @@ vi.mock('../auth/auth-context',()=>({useAuth:vi.fn()}));
 vi.mock('./client-wizard',()=>({ClientWizard:({onClose}:{onClose:()=>void})=><div>Client setup<button onClick={onClose}>Back to dashboard</button></div>}));
 const empty:CoachOverviewData={activeClients:0,pendingClients:0,onboardingReviews:0,checkinReviews:0,dueToday:0,overdue:0,completedWorkouts7d:0,onboarding:[],dueCheckins:[],activity:[]};
 beforeEach(()=>{
-  vi.mocked(useAuth).mockReturnValue({ready:true,user:{id:'coach',role:'COACH',approvalStatus:'APPROVED',displayName:'Alex',email:'coach@example.test',businessName:'Coaching',createdAt:'2026-09-20'},login:vi.fn(),logout:vi.fn(),updateProfile:vi.fn(),switchToClient:vi.fn()});
+  vi.mocked(useAuth).mockReturnValue({ready:true,user:{id:'coach',role:'COACH',approvalStatus:'APPROVED',displayName:'Alex',email:'coach@example.test',businessName:'Coaching',createdAt:'2026-09-20'},login:vi.fn(),logout:vi.fn(),updateProfile:vi.fn(),switchBack:vi.fn(),switchToClient:vi.fn()});
 });
 afterEach(()=>{cleanup();vi.resetAllMocks();});
 function renderPage(path='/coach'){render(<MemoryRouter initialEntries={[path]}><CoachDashboard/></MemoryRouter>);}
@@ -29,11 +29,12 @@ it('renders real counts, review actions, due check-ins and recent activity',asyn
   vi.mocked(apiRequest).mockResolvedValue({overview:{...empty,activeClients:12,pendingClients:2,onboardingReviews:1,checkinReviews:3,dueToday:1,overdue:1,completedWorkouts7d:17,onboarding:[{clientId:'one',clientName:'Taylor',submittedAt:'2026-09-19T10:00:00Z'}],dueCheckins:[{id:'due',clientId:'two',clientName:'Sam',dueDate:'2020-01-01'}],activity:[{id:'workout:1',clientId:'three',clientName:'Morgan',kind:'WORKOUT',title:'Upper body',happenedAt:'2026-09-20T10:00:00Z'}]}});
   renderPage();await screen.findByRole('link',{name:'Review onboarding for Taylor'});
   expect(within(screen.getByRole('link',{name:/Active clients/})).getByText('12')).toBeInTheDocument();
-  expect(within(screen.getByRole('link',{name:/Workouts completed/})).getByText('17')).toBeInTheDocument();
+  expect(within(screen.getByRole('link',{name:/Check-ins due today/})).getByText('1')).toBeInTheDocument();
+  expect(screen.queryByText('Workouts completed')).not.toBeInTheDocument();
   expect(screen.getByRole('link',{name:/2 clients need approval/})).toHaveAttribute('href','/coach?tab=clients');
   expect(screen.getByRole('link',{name:/3 check-ins ready/})).toHaveAttribute('href','/coach/studio?tab=checkins');
   expect(screen.getByText('Sam')).toBeInTheDocument();
-  expect(screen.getByText('Completed · Upper body')).toBeInTheDocument();
+  expect(screen.queryByText('Completed · Upper body')).not.toBeInTheDocument();
 });
 it('shows loading and recoverable errors without misleading zero metrics',async()=>{
   let rejectRequest:(reason:Error)=>void=()=>{};

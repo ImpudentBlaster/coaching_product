@@ -47,7 +47,7 @@ it('locks submitted questionnaires including older records without new fields',a
   expect(screen.getByText('Your coach has reviewed your answers.')).toBeInTheDocument();
 });
 function gate(status:'DRAFT'|'SUBMITTED'|null,approvalStatus:'APPROVED'|'PENDING_REVIEW'='APPROVED') {
-  vi.mocked(useAuth).mockReturnValue({ready:true,user:{id:'client',role:'CLIENT',approvalStatus,displayName:'Client',email:'client@example.test',businessName:null,createdAt:'2026-09-20T00:00:00Z'},login:vi.fn(),logout:vi.fn(),updateProfile:vi.fn(),switchToClient:vi.fn()});
+  vi.mocked(useAuth).mockReturnValue({ready:true,user:{id:'client',role:'CLIENT',approvalStatus,displayName:'Client',email:'client@example.test',businessName:null,createdAt:'2026-09-20T00:00:00Z'},login:vi.fn(),logout:vi.fn(),updateProfile:vi.fn(),switchBack:vi.fn(),switchToClient:vi.fn()});
   vi.mocked(apiRequest).mockResolvedValue({onboarding:status?{...draft,status}:null});
   render(<MemoryRouter initialEntries={['/client/hub?tab=program']}><Routes><Route path="/client" element={<ClientOnboardingGate/>}><Route path="hub" element={<p>Training plan</p>}/><Route path="onboarding" element={<p>Initial questionnaire</p>}/></Route></Routes></MemoryRouter>);
 }

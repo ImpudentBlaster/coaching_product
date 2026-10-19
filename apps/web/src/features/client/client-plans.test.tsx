@@ -1,0 +1,42 @@
+import '@testing-library/jest-dom/vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import { ClientTrainingPlan } from './client-training-plan';
+import { AssignedNutritionPlan } from './assigned-nutrition-plan';
+import { apiRequest, type ProgramAssignment } from '../../lib/api';
+vi.mock('../../components/exercise-gif', () => ({ ExerciseGif: () => <span>Exercise preview</span> }));
+vi.mock('../../lib/api', () => ({ apiRequest: vi.fn() }));
+afterEach(() => { cleanup(); vi.resetAllMocks(); });
+const exercise = { exerciseId: 'press', name: 'Chest press', position: 0, sets: 3, repetitions: 10, durationSeconds: null, restSeconds: 60, targetRpe: 7, tempo: '3010', notes: 'Keep shoulders down', gifAvailable: false, instructions: ['Press with control.'] };
+const assignment: ProgramAssignment = { id: 'assignment', programId: 'program', assignedAt: '2026-10-18', snapshot: { name: 'Strength foundation', description: 'Build strength steadily.', days: [{ dayLabel: 'Monday', name: 'Upper body', exercises: [exercise] }, { dayLabel: 'Thursday', name: 'Lower body', exercises: [{ ...exercise, exerciseId: 'squat', name: 'Squat', sets: 4 }] }] } };
+it('shows assigned workout days and exercise details without workout recording actions', () => {
+  render(<ClientTrainingPlan assignment={assignment} />);
+  expect(screen.getByRole('heading', { name: 'Chest press' })).toBeInTheDocument();
+  expect(screen.getByText('3010')).toBeInTheDocument();
+  expect(screen.getByText('Keep shoulders down')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: 'Day 2 Thursday' }));
+  expect(screen.queryByRole('heading', { name: 'Chest press' })).not.toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Squat' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Start workout' })).not.toBeInTheDocument();
+  fireEvent.keyDown(screen.getByRole('tab', { name: 'Day 2 Thursday' }), { key: 'ArrowLeft' });
+  expect(screen.getByRole('tab', { name: 'Day 1 Monday' })).toHaveAttribute('aria-selected', 'true');
+});
+it('shows an assigned supplement plan even without a meal plan', async () => {
+  vi.mocked(apiRequest).mockResolvedValue({ assignment: null, supplements: { snapshot: { name: 'Daily essentials', kind: 'supplements', notes: 'Follow your coach’s guidance.', supplements: [{ name: 'Example supplement', timing: 'With breakfast', dosage: 'As assigned', link: 'https://example.test/product' }] } } });
+  render(<AssignedNutritionPlan supplementsOnly />);
+  expect(await screen.findByRole('heading', { name: 'Daily essentials', level: 2 })).toBeInTheDocument();
+  expect(screen.getByText('With breakfast')).toBeInTheDocument();
+  expect(screen.getByText('As assigned')).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'Assigned meal plan' })).not.toBeInTheDocument();
+});
+it('retries failed requests and keeps nutrition and supplement empty states separate', async () => {
+  vi.mocked(apiRequest).mockRejectedValueOnce(new Error('Connection lost')).mockResolvedValueOnce({ assignment: null, supplements: null });
+  const view = render(<AssignedNutritionPlan />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Connection lost');
+  fireEvent.click(screen.getByRole('button', { name: 'Retry assigned plans' }));
+  expect(await screen.findByText('Your coach has not assigned a meal plan yet.')).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'Assigned supplement plan' })).not.toBeInTheDocument();
+  view.rerender(<AssignedNutritionPlan supplementsOnly />);
+  expect(screen.getByText('Your coach has not assigned a supplement plan yet.')).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'Assigned meal plan' })).not.toBeInTheDocument();
+});

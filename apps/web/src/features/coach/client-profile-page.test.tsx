@@ -8,8 +8,8 @@ import { ClientProfilePage,type ClientProfile } from './client-profile-page';
 vi.mock('../../lib/api',()=>({apiRequest:vi.fn()}));
 vi.mock('../auth/auth-context',()=>({useAuth:vi.fn()}));
 vi.mock('./client-wizard',()=>({ClientWizard:({clientId,onClose}:{clientId:string;onClose:()=>void})=><div>Edit {clientId}<button onClick={onClose}>Close editor</button></div>}));
-const profile:ClientProfile={client:{id:'client',displayName:'Taylor Client',email:'taylor@example.test',phone:null,status:'APPROVED',joinedAt:'2026-09-01'},onboarding:{status:'SUBMITTED',data:{age:30,weight:72}},program:null,nutrition:null,subscription:null,progress:[],workouts:[],checkins:[]};
-beforeEach(()=>{vi.mocked(useAuth).mockReturnValue({ready:true,user:{id:'coach',role:'COACH',approvalStatus:'APPROVED',displayName:'Coach',email:'coach@example.test',businessName:null,createdAt:'2026-09-01'},login:vi.fn(),logout:vi.fn(),updateProfile:vi.fn(),switchToClient:vi.fn()});});
+const profile:ClientProfile={client:{id:'client',displayName:'Taylor Client',email:'taylor@example.test',phone:null,status:'APPROVED',joinedAt:'2026-09-01'},onboarding:{status:'SUBMITTED',data:{age:30,weight:72}},program:null,nutrition:null,subscription:null,progress:[],checkins:[]};
+beforeEach(()=>{vi.mocked(useAuth).mockReturnValue({ready:true,user:{id:'coach',role:'COACH',approvalStatus:'APPROVED',displayName:'Coach',email:'coach@example.test',businessName:null,createdAt:'2026-09-01'},login:vi.fn(),logout:vi.fn(),updateProfile:vi.fn(),switchBack:vi.fn(),switchToClient:vi.fn()});});
 afterEach(()=>{cleanup();vi.resetAllMocks();});
 it('separates supplement headings and deletes only the client assignment after confirmation',async()=>{
   HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};

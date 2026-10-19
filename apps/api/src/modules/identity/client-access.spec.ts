@@ -98,6 +98,19 @@ describe.skipIf(!process.env.DATABASE_URL)('client account actions', () => {
     expect((await request(app).get('/auth/me').set('Authorization', `Bearer ${refreshedSession.accessToken}`)).status).toBe(401);
     expect((await pool.query("SELECT 1 FROM audit_events WHERE action='COACH_SWITCHED_TO_CLIENT' AND actor_user_id=$1 AND entity_id=$2", [coach, id])).rowCount).toBe(1);
   });
+  it('returns switched sessions to the original coach and denies direct clients', async () => {
+    await pool.query("UPDATE users SET account_status='APPROVED' WHERE id=$1", [coach]);
+    const id = await client(), direct = await session(id), auth = await session(coach);
+    expect((await request(app).post('/auth/switch-back').set('Authorization', direct.bearer).set('Cookie', direct.cookie)).status).toBe(403);
+    const switched = await request(app).post('/auth/switch-client/'+id).set('Authorization', auth.bearer).set('Cookie', auth.cookie);
+    expect((switched.body as { user: { canSwitchBack?: boolean } }).user.canSwitchBack).toBe(true);
+    const refreshed = await request(app).post('/auth/refresh').set('Cookie', switched.headers['set-cookie']![0]!.split(';')[0]!);
+    expect((refreshed.body as { user: { canSwitchBack?: boolean } }).user.canSwitchBack).toBe(true);
+    const back = await request(app).post('/auth/switch-back').set('Authorization', 'Bearer '+(refreshed.body as { accessToken: string }).accessToken).set('Cookie', refreshed.headers['set-cookie']![0]!.split(';')[0]!);
+    expect(back.status).toBe(200); expect((back.body as { user: { id: string } }).user.id).toBe(coach);
+    expect((await request(app).get('/auth/me').set('Authorization', 'Bearer '+(refreshed.body as { accessToken: string }).accessToken)).status).toBe(401);
+    expect((await request(app).get('/auth/me').set('Authorization', 'Bearer '+(back.body as { accessToken: string }).accessToken)).status).toBe(200);
+  });
   it('does not keep an access token valid through a rotated session after logout', async () => {
     const id = await client(), auth = await session(id);
     const refreshed = await request(app).post('/auth/refresh').set('Cookie', auth.cookie);

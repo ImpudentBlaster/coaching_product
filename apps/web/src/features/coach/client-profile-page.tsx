@@ -24,7 +24,6 @@ export type ClientProfile = {
   nutrition:{planId?:string;snapshot:NutritionNode;assignedAt:string}|null;
   subscription:{plan_name:string;status:string;starts_on:string;ends_or_renews_on:string|null;notes:string;amount:string|null;currency:string|null}|null;
   progress:Array<Record<string,unknown>>;
-  workouts:Array<{id:string;name:string;status:string;startedAt:string;completedAt:string|null}>;
   checkins:Checkin[];
 };
 const tabs=[['overview','Overview'],['questionnaire','Questionnaire'],['training','Training'],['nutrition','Nutrition'],['supplements','Supplements'],['progress','Progress'],['checkins','Check-ins'],['membership','Membership']] as const;
@@ -59,7 +58,7 @@ function Profile({clientId,coachId}:{clientId:string;coachId:string}){
   const back=<Link className="profile-back" to="/coach?tab=clients">← Back to clients</Link>;
   if(error)return <section>{back}<div className="card plan-summary" role="alert"><h1>Unable to open client profile</h1><p>{error}</p><button className="secondary" onClick={()=>void refresh()}>Try again</button></div></section>;
   if(loading||!profile)return <section>{back}<p role="status">Loading client profile…</p></section>;
-  const {client,onboarding,program,nutrition,subscription,progress,workouts,checkins}=profile;
+  const {client,onboarding,program,nutrition,subscription,progress,checkins}=profile;
   const latestWeight=progress.find(entry=>entry.body_weight!==null&&entry.body_weight!==undefined);
   const relationship:ClientRelationship={id:clientId,coachId,clientId,status:'APPROVED',rejectionReason:null,createdAt:client.joinedAt,client:{id:clientId,email:client.email,displayName:client.displayName,role:'CLIENT',approvalStatus:'APPROVED',businessName:null,createdAt:client.joinedAt}};
   const currentPlan=(kind:ClientPlanKind)=>kind==='program'&&program?{id:program.programId,name:program.snapshot.name}:kind==='nutrition'&&nutrition?.planId?{id:nutrition.planId,name:nutrition.snapshot.name}:kind==='supplements'&&profile.supplements?.planId?{id:profile.supplements.planId,name:profile.supplements.snapshot.name}:undefined;
@@ -77,7 +76,6 @@ function Profile({clientId,coachId}:{clientId:string;coachId:string}){
     <div className="client-profile-content">
       {tab==='overview'&&<div className="client-profile-grid"><section className="card plan-summary"><h2>Coaching plan</h2><dl className="profile-facts"><div><dt>Training</dt><dd>{program?.snapshot.name??'No program assigned'}</dd></div><div><dt>Nutrition</dt><dd>{nutrition?.snapshot.name??'No plan assigned'}</dd></div><div><dt>Supplements</dt><dd>{profile.supplements?.snapshot.name ?? 'No supplement plan assigned'}</dd></div><div><dt>Initial questionnaire</dt><dd>{onboarding?.status.toLowerCase()??'Not started'}</dd></div></dl><Link className="secondary" to="?tab=questionnaire">View questionnaire</Link></section>
         <section className="card plan-summary"><h2>Latest check-ins</h2>{checkins.filter(item=>item.submittedAt).slice(0,3).map(item=><div className="profile-record" key={item.id}><strong>{item.form.name}</strong><p>Due {date(item.dueDate)} · {item.status.toLowerCase()}</p></div>)}{!checkins.some(item=>item.submittedAt)&&<p>No submitted check-ins yet.</p>}<Link className="secondary" to="?tab=checkins">View check-ins</Link></section>
-        <section className="card plan-summary"><h2>Recent workouts</h2>{workouts.length?workouts.slice(0,5).map(item=><div className="profile-record" key={item.id}><strong>{item.name??'Workout'}</strong><p>{date(item.startedAt)} · {item.status.replaceAll('_',' ').toLowerCase()}</p></div>):<p>No workouts recorded yet.</p>}<Link className="secondary" to="?tab=training">View training</Link></section>
         <section className="card plan-summary"><h2>Latest measurements</h2>{progress[0]?<><p>Recorded {formatDate(String(progress[0].measurement_date))}</p><dl className="profile-facts">{[['body_weight','Weight',' kg'],['waist','Waist',' cm'],['chest','Chest',' cm'],['arm','Arm',' cm']].map(([key,label,unit])=><div key={key}><dt>{label}</dt><dd>{value(progress[0]?.[key!],unit)}</dd></div>)}</dl></>:<p>No measurements recorded yet.</p>}<Link className="secondary" to="?tab=progress">View progress</Link></section></div>}
       {tab==='questionnaire'&&<div className="card profile-questionnaire"><CoachOnboarding clientId={clientId} onReviewed={()=>setProfile(current=>current&&current.onboarding?{...current,onboarding:{...current.onboarding,status:'REVIEWED'}}:current)}/></div>}
       {tab==='training'&&<section className="card plan-summary"><div className="client-plan-heading"><h2>{program?.snapshot.name??'Workout program'}</h2>{planActions('program')}</div>{!program&&<h3 className="client-assigned-plan-title">No program assigned</h3>}{program?<ClientTrainingDetails program={program}/>:<p>Choose an existing workout program or create one for this client.</p>}</section>}

@@ -31,6 +31,7 @@ export function CoachOverview({name}:{name:string}) {
   const [attempt,setAttempt] = useState(0);
   const [adding,setAdding] = useState(false);
   const today = localDate();
+  const activity = data?.activity.filter(item => item.kind !== 'WORKOUT') ?? [];
   useEffect(()=>{
     let active=true;setLoading(true);setError('');
     void apiRequest<{overview:CoachOverviewData}>(`/coach/dashboard?date=${today}`).then(result=>{
@@ -49,7 +50,7 @@ export function CoachOverview({name}:{name:string}) {
           <Metric label="Active clients" value={data.activeClients} detail="Approved and ready to coach" to="/coach?tab=clients"/>
           <Metric label="Onboarding to review" value={data.onboardingReviews} detail="Submitted questionnaires" to="#onboarding-reviews"/>
           <Metric label="Check-ins to review" value={data.checkinReviews} detail="Submitted and awaiting feedback" to="/coach/studio?tab=checkins"/>
-          <Metric label="Workouts completed" value={data.completedWorkouts7d} detail="In the last 7 days" to="/coach/studio?tab=activity"/>
+          <Metric label="Check-ins due today" value={data.dueToday} detail="Awaiting client updates" to="/coach/studio?tab=checkins"/>
         </div>
         <div className="overview-priority">
           <section className="card overview-panel overview-attention" id="onboarding-reviews"><header><div><p className="eyebrow">Your next actions</p><h2>Needs your attention</h2></div><span className="overview-count">{data.pendingClients+data.onboardingReviews+data.checkinReviews}</span></header>
@@ -65,8 +66,8 @@ export function CoachOverview({name}:{name:string}) {
           </section>
         </div>
         <DashboardLatest data={data}/>
-        <section className="card overview-panel overview-activity"><header><div><p className="eyebrow">Across your clients</p><h2>Recent activity</h2></div><Link to="/coach/studio?tab=activity">Workout history →</Link></header>
-          {data.activity.length===0?<div className="overview-empty"><h3>Your clients’ activity starts here</h3><p>Completed workouts and submitted questionnaires or check-ins will appear as clients get started.</p></div>:data.activity.map(item=><div className="overview-task" key={item.id}><span className="overview-task-icon" aria-hidden="true">{item.kind==='WORKOUT'?'↗':'✓'}</span><div><strong>{item.clientName}</strong><p>{item.kind==='WORKOUT'?'Completed': 'Submitted'} · {item.title}</p></div><time dateTime={item.happenedAt}>{shortDate(item.happenedAt)}</time></div>)}
+        <section className="card overview-panel overview-activity"><header><div><p className="eyebrow">Across your clients</p><h2>Recent activity</h2></div><Link to="/coach/studio?tab=checkins">View check-ins →</Link></header>
+          {activity.length===0?<div className="overview-empty"><h3>Your clients’ activity starts here</h3><p>Submitted questionnaires and check-ins will appear as clients get started.</p></div>:activity.map(item=><div className="overview-task" key={item.id}><span className="overview-task-icon" aria-hidden="true">✓</span><div><strong>{item.clientName}</strong><p>Submitted · {item.title}</p></div><time dateTime={item.happenedAt}>{shortDate(item.happenedAt)}</time></div>)}
         </section>
         <nav className="overview-shortcuts" aria-label="Coaching shortcuts"><Link to="/coach?tab=clients">Manage clients <span>→</span></Link><Link to="/coach/studio?tab=programs">Training programs <span>→</span></Link><Link to="/coach/studio?tab=nutrition">Nutrition plans <span>→</span></Link><Link to="/coach/studio?tab=checkins">Check-ins <span>→</span></Link></nav>
       </>}

@@ -1,0 +1,69 @@
+.client-profile-home { display: grid; gap: 24px; min-width: 0; }
+.client-page-intro { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.app-content .client-page-intro h1 { font-size: clamp(1.6rem, 2.7vw, 2.25rem); line-height: 1.2; margin: 8px 0 0; letter-spacing: -.035em; }
+.client-account-label { display: flex; gap: 8px; align-items: center; color: var(--color-muted); font-size: .75rem; white-space: nowrap; }
+.client-account-label > span { width: 6px; height: 6px; border-radius: 50%; background: var(--color-primary); }
+.client-welcome-banner { display: flex; align-items: center; gap: 18px; padding: 24px; border: 1px solid #cde4d8; border-radius: var(--radius-panel); background: #eaf4ee; }
+.client-banner-icon { display: grid; place-items: center; flex: 0 0 42px; height: 42px; background: #d7ebde; color: var(--color-primary); border-radius: 12px; }
+.client-banner-icon svg, .client-training-icon svg, .client-essential-icon svg { width: 22px; height: 22px; }
+.client-welcome-banner strong { font-size: .95rem; color: #174631; }
+.client-welcome-banner p { color: #4f6b5c; font-size: .8125rem; margin: 6px 0 0; line-height: 1.65; }
+.client-welcome-banner button { align-self: flex-start; margin-left: auto; padding: 0 4px; font-size: 24px; line-height: 1; color: #537362; }
+.client-identity-card { overflow: hidden; }
+.client-identity-body { padding: 28px; display: flex; flex-direction: column; gap: 26px; }
+.client-identity { display: flex; align-items: center; gap: 18px; min-width: 0; }
+.client-profile-avatar { flex: 0 0 68px; height: 68px; display: grid; place-items: center; border-radius: 20px; background: #ecf2e9; border: 1px solid #dbe7d7; color: #557450; font-size: 1.4rem; font-weight: 650; }
+.client-name-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.client-name-row h2 { margin: 0; font-size: 1.25rem; letter-spacing: -.025em; }
+.client-membership-badge { display: inline-flex; border-radius: 6px; padding: 5px 9px; background: #edf6ef; color: var(--color-primary); font-size: .6875rem; font-weight: 650; text-transform: capitalize; }
+.client-identity p { font-size: .8125rem; color: var(--color-muted); overflow-wrap: anywhere; margin: 7px 0; }
+.client-identity a { font-size: .75rem; font-weight: 600; color: var(--color-primary); }
+.client-summary-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.client-summary-stats > div { min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-card); background: #fafcf9; padding: 15px; }
+.client-summary-stats dt { color: var(--color-muted); font-size: .6875rem; margin-bottom: 9px; }
+.client-summary-stats dd { margin: 0; font-size: .875rem; line-height: 1.4; font-weight: 650; overflow-wrap: anywhere; }
+.client-profile-tabs { display: flex; gap: 28px; padding: 0 28px; overflow-x: auto; border-bottom: 1px solid var(--color-border); margin-bottom: 24px; scrollbar-width: thin; }
+.client-identity-card > .client-profile-tabs { margin-bottom: 0; border-bottom: 0; }
+.client-profile-tabs a { position: relative; display: inline-flex; align-items: center; min-height: 54px; flex-shrink: 0; font-size: .8125rem; color: var(--color-muted); font-weight: 600; border-bottom: 2px solid transparent; }
+.client-profile-tabs a[aria-current="page"] { border-bottom-color: var(--color-primary); color: var(--color-primary); }
+.client-profile-tabs a:hover { color: var(--color-primary); }
+.client-overview-grid { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(260px, 1fr); gap: 24px; align-items: start; }
+.client-daily-panel { padding: 26px; min-width: 0; }
+.client-panel-heading { display: flex; gap: 16px; justify-content: space-between; align-items: center; }
+.client-panel-heading .eyebrow, .client-next-step .eyebrow, .client-coach-note .eyebrow { font-size: .625rem; letter-spacing: .12em; }
+.client-panel-heading h2 { margin: 8px 0 0; font-size: 1.2rem; }
+.client-panel-heading > a { color: var(--color-primary); font-size: .75rem; white-space: nowrap; font-weight: 600; }
+.client-panel-description { color: var(--color-muted); font-size: .8125rem; line-height: 1.65; margin: 14px 0 24px; }
+.client-daily-panel .daily-checkin-picker { font-size: .75rem; }
+.client-daily-panel .workbench-grid { grid-template-columns: minmax(0, 1fr); }
+.client-daily-panel .profile-card { padding: 20px; box-shadow: none; border-radius: var(--radius-card); }
+.client-daily-panel .profile-card h2 { font-size: 1rem; }
+.client-daily-panel .profile-card p { font-size: .8125rem; line-height: 1.6; }
+.client-checkin-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 245px; border: 1px dashed #dbe5dd; border-radius: var(--radius-card); padding: 28px; background: #fafcf9; }
+.client-checkin-empty > span { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #e5f1e7; color: var(--color-primary); font-size: 1.3rem; }
+.client-checkin-empty h3 { font-size: 1rem; margin: 18px 0 8px; }
+.client-checkin-empty p { max-width: 290px; color: var(--color-muted); font-size: .8125rem; line-height: 1.8; margin: 0; }
+.client-today-rail { display: grid; gap: 20px; }
+.client-next-step, .client-coach-note { padding: 26px; }
+.client-training-icon { display: grid; width: 44px; height: 44px; place-items: center; color: var(--color-primary); background: #eaf3eb; border-radius: 12px; margin: 20px 0; }
+.client-next-step h2, .client-coach-note h2 { font-size: 1.2rem; line-height: 1.4; margin: 0 0 12px; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.client-next-step p:not(.eyebrow), .client-coach-note p { color: var(--color-muted); font-size: .8125rem; line-height: 1.75; margin: 0 0 20px; }
+.client-next-step .link-button { display: flex; justify-content: space-between; gap: 12px; font-size: .8125rem; }
+.client-coach-note { background: #f0f3e9; border-color: #dee5d3; }
+.client-coach-note h2 { margin-top: 14px; }
+.client-coach-note > a { color: var(--color-primary); font-weight: 650; font-size: .8125rem; }
+.client-essentials { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.client-essential { display: flex; align-items: center; gap: 14px; padding: 22px; transition: border-color 150ms ease; min-width: 0; }
+.client-essential:hover { border-color: #8ab29b; }
+.client-essential-icon { display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; border-radius: 10px; background: #eff4ed; color: var(--color-primary); }
+.client-essential h2 { font-size: .875rem; margin: 0 0 6px; }
+.client-essential p { color: var(--color-muted); font-size: .6875rem; line-height: 1.5; margin: 0; overflow-wrap: anywhere; }
+.client-essential > span:last-child { margin-left: auto; color: var(--color-muted); }
+.client-dashboard-error { padding: 28px; }
+@media (min-width: 1500px) { .client-identity-body { flex-direction: row; align-items: center; justify-content: space-between; } .client-summary-stats { flex: 1; max-width: 660px; } }
+@media (max-width: 1000px) { .client-overview-grid { grid-template-columns: minmax(0, 1fr); } .client-today-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); } .client-essentials { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .client-profile-home { gap: 18px; } .client-page-intro { align-items: flex-start; } .client-account-label { display: none; } .client-welcome-banner { padding: 18px; gap: 12px; } .client-banner-icon { display: none; } .client-identity-body, .client-daily-panel, .client-next-step, .client-coach-note { padding: 20px; } .client-profile-avatar { flex-basis: 52px; height: 52px; border-radius: 16px; font-size: 1.1rem; } .client-name-row h2 { font-size: 1.1rem; } .client-summary-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .client-summary-stats > div:nth-child(2) { grid-column: span 1; } .client-summary-stats > div:last-child { grid-column: span 2; } .client-profile-tabs { padding: 0 20px; gap: 24px; } .client-today-rail { grid-template-columns: minmax(0, 1fr); } .client-daily-panel .profile-card { padding: 16px; } }
+.client-space { display: grid; gap: var(--space-6); min-width: 0; }
+.client-space > section { min-width: 0; width: 100%; }
+.client-profile-refresh-error { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); font-size: .8rem; }
+.client-profile-refresh-error p { margin: 0; }

@@ -64,7 +64,7 @@ export function createIdentityRouter(environment: Environment, store: IdentitySt
   router.post('/auth/refresh', async (request, response) => {
     const token = getRefreshCookie(request);
     if (!token) return response.status(401).json({ code: 'UNAUTHENTICATED', message: 'Authentication required' });
-    try { const rotated = await store.rotateRefreshSession(token); setRefreshCookie(response, rotated.token, environment); return response.json({ accessToken: issueAccessToken(environment, { ...rotated.user, sessionFamilyId: 'familyId' in rotated ? String(rotated.familyId) : undefined }), user: toPublicUser(rotated.user) }); }
+    try { const rotated = await store.rotateRefreshSession(token); setRefreshCookie(response, rotated.token, environment); return response.json({ accessToken: issueAccessToken(environment, { ...rotated.user, sessionFamilyId: 'familyId' in rotated ? String(rotated.familyId) : undefined }), user: { ...toPublicUser(rotated.user), canSwitchBack: clientAccess ? await clientAccess.canSwitchBack(rotated.token) : false } }); }
     catch (error) {
       if (!(error instanceof Error) || !['INVALID_REFRESH', 'REFRESH_REUSE'].includes(error.message)) throw error;
       clearRefreshCookie(response, environment); return response.status(401).json({ code: 'UNAUTHENTICATED', message: 'Authentication required' });
@@ -176,6 +176,15 @@ export function createIdentityRouter(environment: Environment, store: IdentitySt
 
   router.get('/client/workspace', auth, requireRole('CLIENT'), async (request: AuthenticatedRequest, response) => response.json(await store.getClientWorkspace(request.auth?.userId ?? '')));
 
+  router.post('/auth/switch-back', authLimiter, auth, requireRole('CLIENT'), async (request, response) => {
+    if (!clientAccess) return response.status(403).json({ message: 'No coach session to return to.' });
+    const switched = await clientAccess.switchBack(request.auth!.userId, getRefreshCookie(request) ?? '');
+    const user = await store.findById(switched.coachId);
+    if (!user) throw new Error('Coach not found after switch');
+    setRefreshCookie(response, switched.token, environment);
+    response.set('Cache-Control', 'no-store');
+    return response.json({ accessToken: issueAccessToken(environment, { ...user, sessionFamilyId: switched.familyId }), user: toPublicUser(user) });
+  });
   router.post('/auth/switch-client/:clientId', authLimiter, auth, requireRole('COACH'), async (request, response) => {
     if (!clientAccess) return response.status(503).json({ message: 'Client switching requires PostgreSQL mode.' });
     const clientId = z.string().uuid().parse(request.params.clientId);
@@ -184,7 +193,7 @@ export function createIdentityRouter(environment: Environment, store: IdentitySt
     if (!user) throw new Error('Client not found after switch');
     setRefreshCookie(response, switched.token, environment);
     response.set('Cache-Control', 'no-store');
-    return response.json({ accessToken: issueAccessToken(environment, { ...user, sessionFamilyId: switched.familyId }), user: toPublicUser(user) });
+    return response.json({ accessToken: issueAccessToken(environment, { ...user, sessionFamilyId: switched.familyId }), user: { ...toPublicUser(user), canSwitchBack: true } });
   });
   router.delete('/coach/clients/:clientId', auth, requireRole('COACH'), async (request, response) => {
     if (!clientAccess) return response.status(503).json({ message: 'Client deletion requires PostgreSQL mode.' });

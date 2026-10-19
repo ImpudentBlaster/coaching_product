@@ -545,3 +545,6 @@ button,.link-button{transition:background-color .18s ease,border-color .18s ease
 .packages-page .collection-table td:nth-child(5) { width: 30%; min-width: 240px; }
 .packages-page .status { display: inline-flex; align-items: center; white-space: nowrap; }
 .package-included-plans { display: grid; gap: 4px; line-height: 1.5; overflow-wrap: anywhere; }
+
+.client-view-return { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 24px; }
+.client-view-return button { color: #1677ff; background: #fff; border: 1px solid #1677ff; border-radius: 15px; padding: 14px; font-size: 14px; }
