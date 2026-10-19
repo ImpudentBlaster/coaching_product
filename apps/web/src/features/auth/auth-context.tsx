@@ -9,6 +9,7 @@ type AuthContextValue = {
   login(email: string, password: string): Promise<User>;
   updateProfile(displayName: string, businessName?: string): Promise<User>;
   logout(): Promise<void>;
+  switchBack(): Promise<User>;
   switchToClient(clientId: string): Promise<User>;
 };
 
@@ -31,6 +32,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [attempt]);
   const value = useMemo<AuthContextValue>(() => ({
     user, ready,
+    async switchBack() {
+      const result = await apiRequest<{ accessToken: string; user: User }>('/auth/switch-back', { method: 'POST' });
+      setAccessToken(result.accessToken); setUser(result.user); return result.user;
+    },
     async switchToClient(clientId) {
       const result = await apiRequest<{ accessToken: string; user: User }>(`/auth/switch-client/${clientId}`, { method: 'POST' });
       setAccessToken(result.accessToken); setUser(result.user); return result.user;
@@ -41,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     async updateProfile(displayName, businessName) {
       const result = await apiRequest<{ user: User }>('/auth/me', { method: 'PATCH', body: JSON.stringify({ displayName, businessName }) });
-      setUser(result.user); return result.user;
+      setUser({ ...result.user, canSwitchBack: user?.canSwitchBack ?? false }); return result.user;
     },
     async logout() { try { await apiRequest('/auth/logout', { method: 'POST' }); } finally { setAccessToken(null); setUser(null); } },
   }), [ready, user]);

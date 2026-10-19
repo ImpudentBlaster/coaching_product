@@ -8,7 +8,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { apiRequest } from '../../lib/api';
 import type { ClientRelationship } from '../../lib/api';
 import { NutritionStudio } from './nutrition-studio';
-import { AssignedNutritionPlan, type NutritionEntry } from '../nutrition/nutrition-details';
+import type { NutritionEntry } from '../nutrition/nutrition-details';
+import { AssignedNutritionPlan } from '../client/assigned-nutrition-plan';
 
 vi.mock('../../lib/api', () => ({ apiRequest: vi.fn() }));
 HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
@@ -130,9 +131,11 @@ it('shows an assigned plan with days, meals, food quantities and daily totals', 
   vi.mocked(apiRequest).mockResolvedValue({ assignment: { snapshot: { kind: 'plans', name: 'Weekly plan', notes: '', items: [{ id: 'day', label: 'Day 1', node: day }] } } });
   render(<AssignedNutritionPlan/>);
   await screen.findByRole('heading', { name: 'Weekly plan' });
-  expect(screen.getByText('Day 1 — Training day')).toBeInTheDocument();
-  expect(screen.getByText('Morning — Breakfast')).toBeInTheDocument();
-  expect(screen.getByText('Oats · 100 g')).toBeInTheDocument();
+  fireEvent.click(screen.getByText('Day 1'));
+  expect(screen.getByRole('region', { name: 'Day schedule' })).toBeInTheDocument();
+  fireEvent.click(screen.getByText('Morning'));
+  expect(screen.getByRole('heading', { name: 'Oats' })).toBeInTheDocument();
+  expect(screen.getByText('100 g')).toBeInTheDocument();
 });
 
 it('searches starter and manual foods in meals and saves the selected starter copy', async () => {

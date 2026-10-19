@@ -1,0 +1,5 @@
+import './client-plans.css';
+const targets = [ ['daily_calories', 'Daily calories', 'kcal'], ['protein_grams', 'Protein', 'g'], ['carbohydrate_grams', 'Carbohydrates', 'g'], ['fat_grams', 'Fat', 'g'] ] as const;
+export function ClientNutritionTargets({ plan }: { plan: Record<string, unknown> | null }) {
+  return <section className="card client-plan-panel client-nutrition-targets"><header className="client-plan-heading"><div><p className="eyebrow">Your daily guide</p><h2>Nutrition targets</h2></div></header>{plan ? <><dl className="client-target-grid">{targets.map(([key, label, unit]) => <div key={key}><dt>{label}</dt><dd>{plan[key] === null || plan[key] === undefined ? '—' : <>{String(plan[key])} <small>{unit}</small></>}</dd></div>)}</dl>{['meal_guidance','notes'].map(key => typeof plan[key] === 'string' && plan[key] ? <section className="client-target-note" key={key}><h3>{key === 'notes' ? 'Coach’s notes' : 'Meal guidance'}</h3><p>{String(plan[key])}</p></section> : null)}</> : <p className="client-plan-empty">No separate daily targets assigned. Use the day totals in your meal plan above.</p>}</section>;
+}

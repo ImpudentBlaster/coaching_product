@@ -1,3 +1,4 @@
+import { ClientLayout } from '../features/client/client-layout';
 import { ClientProfilePage } from '../features/coach/client-profile-page';
 import { PackagesPage } from '../features/coach/packages-page';
 import { ClientOnboardingGate } from '../features/client/client-onboarding-gate';
@@ -36,10 +37,10 @@ export const router = createBrowserRouter([{ path: '/', element: <AuthProvider><
   { path: 'coach/feed', element: <CommunityFeed /> },
   { path: 'coach/studio', element: <CoachMvpPage /> },
   { path: 'coach/packages', element: <PackagesPage /> },
-  { path: 'client', element: <ClientOnboardingGate />, children: [
+  { path: 'client', element: <ClientLayout />, children: [{ element: <ClientOnboardingGate />, children: [
     { index: true, element: <ClientDashboard /> },
     { path: 'onboarding', element: <ClientOnboardingPage /> },
     { path: 'feed', element: <CommunityFeed /> },
     { path: 'hub', element: <ClientMvpPage /> },
-  ] },
+  ] }] },
 ] }]);

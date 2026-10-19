@@ -4,10 +4,12 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 import { AppLayout } from './app-layout';
 
+const authState = vi.hoisted(() => ({ user: { displayName: 'Alex', role: 'COACH', canSwitchBack: false }, switchBack: vi.fn().mockResolvedValue({}) }));
+
 vi.mock('../features/auth/auth-context', () => ({
-  useAuth: () => ({ user: { displayName: 'Alex', role: 'COACH' }, logout: vi.fn() }),
+  useAuth: () => ({ ...authState, logout: vi.fn() }),
 }));
-afterEach(cleanup);
+afterEach(() => { cleanup(); authState.user.role = 'COACH'; authState.user.canSwitchBack = false; });
 
 function setup() {
   render(<MemoryRouter initialEntries={['/coach/studio?tab=workouts']}><AppLayout /></MemoryRouter>);
@@ -51,4 +53,14 @@ it('keeps all submenus open while hovering, clicking categories and navigating',
   expect(nav.getByRole('link', { name: 'Clients' })).toBeInTheDocument();
   fireEvent.pointerLeave(sidebar);
   expect(nav.queryByRole('link', { name: 'Clients' })).not.toBeInTheDocument();
+});
+
+it('shows the return button only for a coach-created client session', () => {
+  authState.user.role = 'CLIENT';
+  const view = render(<MemoryRouter><AppLayout /></MemoryRouter>);
+  expect(screen.queryByRole('button', { name: /Viewing as client/ })).not.toBeInTheDocument();
+  authState.user.canSwitchBack = true;
+  view.rerender(<MemoryRouter><AppLayout /></MemoryRouter>);
+  fireEvent.click(screen.getByRole('button', { name: /Viewing as client/ }));
+  expect(authState.switchBack).toHaveBeenCalledTimes(1);
 });

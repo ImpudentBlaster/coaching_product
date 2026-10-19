@@ -1,4 +1,5 @@
 export type User = {
+  canSwitchBack?: boolean;
   id: string; email: string; role: 'PLATFORM_ADMIN' | 'COACH' | 'CLIENT';
   displayName: string; businessName: string | null;
   approvalStatus: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'SUSPENDED'; createdAt: string;
@@ -54,7 +55,7 @@ export function setAccessToken(token: string | null): void { accessToken = token
 
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response = await send(path, init);
-  if (response.status === 401 && (!path.startsWith('/auth/') || path.startsWith('/auth/switch-client/'))) {
+  if (response.status === 401 && (!path.startsWith('/auth/') || path.startsWith('/auth/switch-client/') || path === '/auth/switch-back')) {
     await refreshSession();
     response = await send(path, init);
   }

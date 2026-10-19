@@ -59,6 +59,23 @@ export class ClientAccess {
       return { email: row.email, token };
     });
   }
+  async canSwitchBack(token: string) {
+    return Boolean((await this.pool.query('SELECT 1 FROM refresh_sessions WHERE token_hash=$1 AND acting_coach_id IS NOT NULL AND revoked_at IS NULL AND rotated_at IS NULL AND expires_at>now()', [tokenHash(token)])).rowCount);
+  }
+  async switchBack(clientId: string, currentToken: string) {
+    return this.tx(async c => {
+      const session = (await c.query<{ family_id: string; acting_coach_id: string | null }>('SELECT family_id,acting_coach_id FROM refresh_sessions WHERE token_hash=$1 AND user_id=$2 AND revoked_at IS NULL AND rotated_at IS NULL AND expires_at>now() FOR UPDATE', [tokenHash(currentToken), clientId])).rows[0];
+      if (!session?.acting_coach_id) throw new ClientAccessError(403, 'Only a coach viewing a client can switch back.');
+      const coachId = session.acting_coach_id;
+      const row = await this.client(c, coachId, clientId);
+      if (row.status !== 'APPROVED' || row.account_status !== 'APPROVED') throw new ClientAccessError(403, 'Client access is no longer available.');
+      await c.query('UPDATE refresh_sessions SET revoked_at=now() WHERE family_id=$1', [session.family_id]);
+      const token = randomBytes(48).toString('base64url'), familyId = randomUUID();
+      await c.query("INSERT INTO refresh_sessions(user_id,family_id,token_hash,expires_at) VALUES($1,$2,$3,now()+interval '30 days')", [coachId, familyId, tokenHash(token)]);
+      await this.audit(c, coachId, 'COACH_SWITCHED_BACK_FROM_CLIENT', clientId);
+      return { token, familyId, coachId };
+    });
+  }
   async switchClient(coachId: string, clientId: string, currentToken: string) {
     return this.tx(async c => {
       const row = await this.client(c, coachId, clientId);

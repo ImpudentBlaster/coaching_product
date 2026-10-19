@@ -1,7 +1,7 @@
 import { NavigationSymbol } from './navigation-symbol';
 import { EditorDialog } from './editor-dialog';
 import { useState, type ReactNode } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../features/auth/auth-context';
 
 type NavItem = { label: string; to: string; icon: string };
@@ -13,7 +13,6 @@ const coachNavigation: NavGroup[] = [
     { label: 'Community feed', to: '/coach/feed', icon: '✦' },
     { label: 'Clients', to: '/coach?tab=clients', icon: '♙' },
     { label: 'Check-ins', to: '/coach/studio?tab=checkins', icon: '✓' },
-    { label: 'Activity', to: '/coach/studio?tab=activity', icon: '↗' },
     { label: 'Feedback', to: '/coach/studio?tab=clients', icon: '✦' },
   ] },
   { label: 'Nutrition', icon: '⌁', items: [
@@ -41,6 +40,7 @@ const clientNavigation: NavGroup[] = [
     { label: 'Community feed', to: '/client/feed', icon: '✦' },
     { label: 'My plan', to: '/client/hub?tab=program', icon: '▤' },
     { label: 'Nutrition', to: '/client/hub?tab=nutrition', icon: '◒' },
+    { label: 'Supplements', to: '/client/hub?tab=supplements', icon: '▤' },
     { label: 'Progress', to: '/client/hub?tab=progress', icon: '↗' },
     { label: 'Check-ins', to: '/client/hub?tab=checkins', icon: '✓' },
     { label: 'Coach messages', to: '/client/hub?tab=feedback', icon: '✦' },
@@ -123,8 +123,17 @@ function PublicShell({ children }: { children: ReactNode }) {
 }
 
 export function AppLayout() {
-  const { user, logout } = useAuth();
+  const { user, logout, switchBack } = useAuth();
+  const navigate = useNavigate();
+  const [switching, setSwitching] = useState(false);
+  const [switchError, setSwitchError] = useState('');
+  async function returnToCoach() {
+    setSwitching(true); setSwitchError('');
+    try { await switchBack(); navigate('/coach?tab=clients', { replace: true }); }
+    catch (cause) { setSwitchError(cause instanceof Error ? cause.message : 'Unable to return to your coach account.'); }
+    finally { setSwitching(false); }
+  }
   if (!user) return <PublicShell><Outlet /></PublicShell>;
   const groups = user.role === 'COACH' ? coachNavigation : user.role === 'CLIENT' ? clientNavigation : adminNavigation;
-  return <div className="app-shell"><Sidebar groups={groups} name={user.displayName} role={user.role} onLogout={logout} /><main className="app-content"><div className="mobile-topbar"><Link className="brand" to="/">Forme<span>.</span></Link><span>{user.displayName}</span></div><Outlet /></main><MobileNav groups={groups} /></div>;
+  return <div className="app-shell"><Sidebar groups={groups} name={user.displayName} role={user.role} onLogout={logout} /><main className="app-content"><div className="mobile-topbar"><Link className="brand" to="/">Forme<span>.</span></Link><span>{user.displayName}</span></div>{user.role === 'CLIENT' && user.canSwitchBack && <div className="client-view-return"><button type="button" disabled={switching} onClick={() => void returnToCoach()}>{switching ? 'Switching back…' : 'Viewing as client, click to switch back'}</button>{switchError && <p role="alert">{switchError}</p>}</div>}<Outlet /></main><MobileNav groups={groups} /></div>;
 }
